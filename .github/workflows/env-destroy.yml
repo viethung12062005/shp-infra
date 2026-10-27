@@ -1,0 +1,86 @@
+# Hủy một môi trường. Cần gõ đúng chuỗi xác nhận VÀ được duyệt ở GitHub Environment infra-<env>-destroy.
+name: env-destroy
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Môi trường cần hủy"
+        type: choice
+        options: [uat, prod]
+        required: true
+      confirm:
+        description: "Gõ chính xác: destroy-<tên môi trường> (ví dụ destroy-uat)"
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: env-${{ inputs.environment }}
+  cancel-in-progress: false
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Kiểm tra chuỗi xác nhận
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          EXPECTED: destroy-${{ inputs.environment }}
+        run: |
+          [ "$CONFIRM" = "$EXPECTED" ] || { echo "Chuỗi xác nhận sai. Cần: $EXPECTED"; exit 1; }
+  destroy:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: infra-${{ inputs.environment }}-destroy   # dừng chờ người duyệt
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { persist-credentials: false }
+      - uses: azure/login@2035af27c2cea8ff426397d10e3edb28906b51df # v2.3.1
+        with:
+          client-id: ${{ inputs.environment == 'prod' && vars.AZURE_CLIENT_ID_INFRA_PROD_DESTROY || vars.AZURE_CLIENT_ID_INFRA_UAT_DESTROY }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+      - name: init
+        working-directory: envs/${{ inputs.environment }}
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          TFSTATE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=rg-shp-shared" \
+            -backend-config="storage_account_name=$TFSTATE_ACCOUNT" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${ENVIRONMENT}.tfstate" \
+            -backend-config="use_azuread_auth=true"
+      - name: destroy
+        working-directory: envs/${{ inputs.environment }}
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          ADMIN_IP_RANGES: ${{ vars.ADMIN_IP_RANGES }}
+        run: |
+          terraform destroy -auto-approve \
+            -var "subscription_id=$ARM_SUBSCRIPTION_ID" -var "acr_name=$ACR_NAME" \
+            -var "created_at=destroyed" -var "authorized_ip_ranges=$ADMIN_IP_RANGES"
+      - name: Xác nhận resource group đã biến mất
+        env:
+          RG: rg-shp-${{ inputs.environment }}
+        run: |
+          if [ "$(az group exists --name "$RG")" = "true" ]; then
+            echo "Resource group $RG vẫn còn: kiểm tra thủ công để tránh tốn tiền"; exit 1
+          fi
+          echo "Đã hủy sạch $RG"
