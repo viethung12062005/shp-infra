@@ -1,16 +1,16 @@
-# Dựng một môi trường (uat hoặc prod): plan → PHÊ DUYỆT (GitHub Environment infra-<env>) → apply.
-# Môi trường là ephemeral: dựng khi cần thử/demo, hủy bằng env-destroy khi xong.
+# Provision an environment (uat or prod): plan -> APPROVAL (GitHub Environment infra-<env>) -> apply.
+# Environments are ephemeral: provision when needed for testing/demos, destroy with env-destroy when done.
 name: env-provision
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Môi trường cần dựng"
+        description: "Environment to provision"
         type: choice
         options: [uat, prod]
         required: true
       sizing:
-        description: "Kích cỡ (default: uat=small, prod=prod). Chọn prod khi UAT dùng để đo hiệu năng"
+        description: "Sizing (default: uat=small, prod=prod). Pick prod when UAT is used for performance measurements"
         type: choice
         options: [default, small, prod]
         default: default
@@ -68,7 +68,7 @@ jobs:
           args=(-var "subscription_id=$ARM_SUBSCRIPTION_ID" -var "acr_name=$ACR_NAME" -var "created_at=$(date -u +%F)" -var "authorized_ip_ranges=$ADMIN_IP_RANGES")
           if [ "$SIZING" != default ]; then args+=(-var "sizing=$SIZING"); fi
           terraform plan -out=tfplan "${args[@]}"
-          { echo '### Kế hoạch thay đổi'; echo '```'; terraform show -no-color tfplan | head -300; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### Change plan'; echo '```'; terraform show -no-color tfplan | head -300; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: tfplan-${{ inputs.environment }}
@@ -78,7 +78,7 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: infra-${{ inputs.environment }}   # dừng chờ người duyệt
+    environment: infra-${{ inputs.environment }}   # pauses until an approver signs off
     permissions:
       contents: read
       id-token: write
@@ -110,12 +110,12 @@ jobs:
             -backend-config="container_name=tfstate" \
             -backend-config="key=${ENVIRONMENT}.tfstate" \
             -backend-config="use_azuread_auth=true"
-      - name: apply (đúng kế hoạch đã duyệt)
+      - name: apply (exactly the approved plan)
         working-directory: envs/${{ inputs.environment }}
         run: terraform apply tfplan
-      - name: Kết quả
+      - name: Result
         working-directory: envs/${{ inputs.environment }}
         run: |
-          { echo '### Môi trường đã dựng'; echo '```'; terraform output; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      # TODO (ENV-01): cài Argo CD + áp dụng root Application trỏ tới repo GitOps (dùng `az aks command invoke`
-      # để không phải mở API server cho runner), chờ healthy, seed dữ liệu giả, smoke test.
+          { echo '### Environment provisioned'; echo '```'; terraform output; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      # TODO (ENV-01): install Argo CD + apply the root Application pointing at the GitOps repo (use `az aks command invoke`
+      # so the API server need not be opened to the runner), wait for healthy, seed synthetic data, smoke test.
