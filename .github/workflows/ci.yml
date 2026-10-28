@@ -1,4 +1,4 @@
-# CI cho repo hạ tầng: chỉ kiểm tra tĩnh (fmt, validate, tflint, Trivy config). Không bao giờ apply ở đây.
+# CI for the infrastructure repo: static checks only (fmt, validate, tflint, Trivy config). Never applies here.
 name: ci
 on:
   pull_request:

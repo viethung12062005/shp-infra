@@ -1,15 +1,15 @@
-# Hủy một môi trường. Cần gõ đúng chuỗi xác nhận VÀ được duyệt ở GitHub Environment infra-<env>-destroy.
+# Destroy an environment. Requires typing the exact confirmation string AND approval at the GitHub Environment infra-<env>-destroy.
 name: env-destroy
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Môi trường cần hủy"
+        description: "Environment to destroy"
         type: choice
         options: [uat, prod]
         required: true
       confirm:
-        description: "Gõ chính xác: destroy-<tên môi trường> (ví dụ destroy-uat)"
+        description: "Type exactly: destroy-<environment name> (e.g. destroy-uat)"
         type: string
         required: true
 permissions:
@@ -29,17 +29,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Kiểm tra chuỗi xác nhận
+      - name: Check the confirmation string
         env:
           CONFIRM: ${{ inputs.confirm }}
           EXPECTED: destroy-${{ inputs.environment }}
         run: |
-          [ "$CONFIRM" = "$EXPECTED" ] || { echo "Chuỗi xác nhận sai. Cần: $EXPECTED"; exit 1; }
+          [ "$CONFIRM" = "$EXPECTED" ] || { echo "Wrong confirmation string. Expected: $EXPECTED"; exit 1; }
   destroy:
     needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: infra-${{ inputs.environment }}-destroy   # dừng chờ người duyệt
+    environment: infra-${{ inputs.environment }}-destroy   # pauses until an approver signs off
     permissions:
       contents: read
       id-token: write
@@ -76,11 +76,11 @@ jobs:
           terraform destroy -auto-approve \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" -var "acr_name=$ACR_NAME" \
             -var "created_at=destroyed" -var "authorized_ip_ranges=$ADMIN_IP_RANGES"
-      - name: Xác nhận resource group đã biến mất
+      - name: Confirm the resource group is gone
         env:
           RG: rg-shp-${{ inputs.environment }}
         run: |
           if [ "$(az group exists --name "$RG")" = "true" ]; then
-            echo "Resource group $RG vẫn còn: kiểm tra thủ công để tránh tốn tiền"; exit 1
+            echo "Resource group $RG still exists: check manually to avoid unexpected cost"; exit 1
           fi
-          echo "Đã hủy sạch $RG"
+          echo "$RG fully destroyed"

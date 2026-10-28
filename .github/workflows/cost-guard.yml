@@ -1,4 +1,4 @@
-# Mỗi ngày liệt kê môi trường còn sống quá TTL và mở/cập nhật một issue cảnh báo. KHÔNG tự hủy (việc hủy phải qua phê duyệt).
+# Daily: list environments that outlived their TTL and open/update a warning issue. Never destroys anything (destroying requires approval).
 name: cost-guard
 on:
   schedule:
@@ -20,7 +20,7 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID_CI_PLAN }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Tìm môi trường quá hạn
+      - name: Find overdue environments
         id: scan
         run: |
           az group list --query "[?tags.\"shp-env\"].{name:name, env:tags.\"shp-env\", created:tags.\"created-at\", ttl:tags.\"ttl-hours\"}" -o json > rgs.json
@@ -33,25 +33,25 @@ jobs:
                   created = datetime.date.fromisoformat(rg["created"])
                   ttl_h = float(rg["ttl"])
               except (TypeError, ValueError):
-                  overdue.append(f"- `{rg['name']}`: thiếu hoặc sai tag created-at/ttl-hours")
+                  overdue.append(f"- `{rg['name']}`: missing or invalid created-at/ttl-hours tag")
                   continue
               age_h = (today - created).days * 24
               if age_h > ttl_h:
-                  overdue.append(f"- `{rg['name']}` ({rg['env']}): dựng {rg['created']}, TTL {ttl_h:g} giờ, đã quá hạn")
+                  overdue.append(f"- `{rg['name']}` ({rg['env']}): created {rg['created']}, TTL {ttl_h:g} h, overdue")
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"count={len(overdue)}\n")
           open("overdue.md", "w").write("\n".join(overdue))
           PY
-      - name: Mở hoặc cập nhật issue cảnh báo
+      - name: Open or update the warning issue
         if: steps.scan.outputs.count != '0'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          body="Các môi trường dưới đây còn sống quá TTL. Nếu không còn dùng, chạy workflow **env-destroy**.\n\n$(cat overdue.md)"
+          body="The environments below have outlived their TTL. If they are no longer needed, run the **env-destroy** workflow.\n\n$(cat overdue.md)"
           number=$(gh issue list --repo "$REPO" --label cost-guard --state open --json number --jq '.[0].number // empty')
           if [ -n "$number" ]; then
             gh issue comment "$number" --repo "$REPO" --body "$(printf '%b' "$body")"
           else
-            gh issue create --repo "$REPO" --title "Môi trường cloud quá TTL" --label cost-guard --body "$(printf '%b' "$body")"
+            gh issue create --repo "$REPO" --title "Cloud environments past TTL" --label cost-guard --body "$(printf '%b' "$body")"
           fi
