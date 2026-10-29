@@ -63,15 +63,19 @@ resource "azurerm_container_registry" "acr" {
 locals {
   github_issuer = "https://token.actions.githubusercontent.com"
   identities = {
-    # quyền đọc để chạy plan trong pull request
-    "ci-plan" = { subject = "repo:${var.github_owner}/${var.infra_repo}:pull_request" }
-    # dựng/hủy môi trường: chỉ khi job chạy trong GitHub Environment tương ứng (đã có người duyệt)
+    # quyền đọc: bước plan của env-provision và cost-guard. Cả hai chạy từ nhánh main, không có Environment
+    # (CI trên pull request chỉ kiểm tĩnh, không đăng nhập Azure).
+    "ci-plan" = { subject = "repo:${var.github_owner}/${var.infra_repo}:ref:refs/heads/main" }
+    # dựng/hủy môi trường: chỉ khi job chạy trong GitHub Environment tương ứng. Mỗi Environment bị giới hạn ở nhánh
+    # main (deployment branch policy), nên nhánh khác không xin được token mang subject này.
     "infra-uat"          = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-uat" }
     "infra-uat-destroy"  = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-uat-destroy" }
     "infra-prod"         = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-prod" }
     "infra-prod-destroy" = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-prod-destroy" }
-    # đẩy image: chỉ từ nhánh main của repo ứng dụng
+    # đẩy image: chỉ từ nhánh main của repo ứng dụng (subject theo ref, không có Environment)
     "acr-push" = { subject = "repo:${var.github_owner}/${var.app_repo}:ref:refs/heads/main" }
+    # đẩy Helm chart: workflow release-chart ở repo templates, Environment release-chart chỉ nhận tag chart-v*
+    "chart-push" = { subject = "repo:${var.github_owner}/${var.templates_repo}:environment:release-chart" }
   }
 }
 
@@ -95,9 +99,11 @@ resource "azurerm_federated_identity_credential" "github" {
 
 # Quyền tối thiểu
 resource "azurerm_role_assignment" "acr_push" {
+  for_each = toset(["acr-push", "chart-push"])
+
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPush"
-  principal_id         = azurerm_user_assigned_identity.github["acr-push"].principal_id
+  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
 }
 
 resource "azurerm_role_assignment" "state_rw" {
