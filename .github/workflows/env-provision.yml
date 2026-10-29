@@ -1,4 +1,5 @@
-# Provision an environment (uat or prod): plan -> APPROVAL (GitHub Environment infra-<env>) -> apply.
+# Provision an environment (uat or prod): owner check -> plan -> apply -> install Argo CD and hand the cluster to GitOps.
+# Only the repository owner may run it: the private-repo plan has no Environment reviewers, so the owner check is the gate.
 # Environments are ephemeral: provision when needed for testing/demos, destroy with env-destroy when done.
 name: env-provision
 on:
@@ -27,7 +28,18 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
 jobs:
+  operator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Only the repository owner may run this workflow
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          [ "$ACTOR" = "$OWNER" ] || { echo "::error::$ACTOR may not run this workflow; only $OWNER can."; exit 1; }
   plan:
+    needs: operator
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -78,7 +90,7 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: infra-${{ inputs.environment }}   # pauses until an approver signs off
+    environment: infra-${{ inputs.environment }}   # holds the environment's variables; no reviewers on this plan
     permissions:
       contents: read
       id-token: write
@@ -117,5 +129,63 @@ jobs:
         working-directory: envs/${{ inputs.environment }}
         run: |
           { echo '### Environment provisioned'; echo '```'; terraform output; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      # TODO (ENV-01): install Argo CD + apply the root Application pointing at the GitOps repo (use `az aks command invoke`
-      # so the API server need not be opened to the runner), wait for healthy, seed synthetic data, smoke test.
+      # ENV-01: hand the new cluster to GitOps. Argo CD reads shp-gitops and shp-platform-templates through a read-only
+      # GitHub App (repo-creds for the whole owner). Commands run with `az aks command invoke`, so the API server stays
+      # closed to the runner. Synthetic data seeding and smoke tests are not automated yet.
+      - id: repo-app
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ vars.ARGOCD_REPO_APP_ID }}
+          private-key: ${{ secrets.ARGOCD_REPO_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: shp-gitops
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ github.repository_owner }}/shp-gitops
+          token: ${{ steps.repo-app.outputs.token }}
+          path: gitops
+          persist-credentials: false
+      - name: Install Argo CD and apply the root Application
+        working-directory: envs/${{ inputs.environment }}
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          OWNER: ${{ github.repository_owner }}
+          ARGOCD_CHART_VERSION: "10.11.5"
+          REPO_APP_ID: ${{ vars.ARGOCD_REPO_APP_ID }}
+          REPO_APP_INSTALLATION_ID: ${{ vars.ARGOCD_REPO_APP_INSTALLATION_ID }}
+          REPO_APP_PRIVATE_KEY: ${{ secrets.ARGOCD_REPO_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "$REPO_APP_INSTALLATION_ID" ] || { echo "::error::variable ARGOCD_REPO_APP_INSTALLATION_ID is not set"; exit 1; }
+          rg=$(terraform output -raw resource_group_name)
+          aks=$(terraform output -raw aks_name)
+          work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+          cp "$GITHUB_WORKSPACE/gitops/bootstrap/argocd-values.yaml" "$work/argocd-values.yaml"
+          cp "$GITHUB_WORKSPACE/gitops/bootstrap/root-$ENVIRONMENT.yaml" "$work/root.yaml"
+          ( umask 077
+            printf '%s\n' "$REPO_APP_PRIVATE_KEY" > "$work/key.pem"
+            kubectl create secret generic repo-creds-github -n argocd --dry-run=client -o yaml \
+              --from-literal=type=git --from-literal=url="https://github.com/$OWNER" \
+              --from-literal=githubAppID="$REPO_APP_ID" --from-literal=githubAppInstallationID="$REPO_APP_INSTALLATION_ID" \
+              --from-file=githubAppPrivateKey="$work/key.pem" \
+            | kubectl label --local -f - argocd.argoproj.io/secret-type=repo-creds -o yaml > "$work/repo-creds.yaml"
+            rm -f "$work/key.pem" )
+
+          invoke() {  # run a shell command in the cluster; fail the step when the command fails
+            local out
+            out=$(az aks command invoke -g "$rg" -n "$aks" -o json "$@")
+            jq -r '.logs' <<<"$out"
+            [ "$(jq -r '.exitCode' <<<"$out")" = 0 ]
+          }
+          cd "$work"
+          invoke --file argocd-values.yaml --file repo-creds.yaml --file root.yaml --command "set -e
+            helm repo add argo https://argoproj.github.io/argo-helm >/dev/null
+            helm upgrade --install argocd argo/argo-cd --version $ARGOCD_CHART_VERSION -n argocd --create-namespace -f argocd-values.yaml --wait --timeout 10m
+            kubectl apply -f repo-creds.yaml
+            kubectl apply -f root.yaml"
+          invoke --command "set -e
+            kubectl -n argocd wait application/root-$ENVIRONMENT --for=jsonpath='{.status.sync.status}'=Synced --timeout=15m
+            kubectl -n argocd wait application/root-$ENVIRONMENT --for=jsonpath='{.status.health.status}'=Healthy --timeout=15m
+            kubectl -n argocd get applications"
+          { echo '### GitOps handover'; echo "Argo CD $ARGOCD_CHART_VERSION installed; root-$ENVIRONMENT is synced and healthy."
+            echo "Check the add-ons and services with: az aks command invoke -g $rg -n $aks --command 'kubectl -n argocd get applications'"; } >> "$GITHUB_STEP_SUMMARY"

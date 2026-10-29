@@ -1,4 +1,5 @@
-# Destroy an environment. Requires typing the exact confirmation string AND approval at the GitHub Environment infra-<env>-destroy.
+# Destroy an environment. Only the repository owner may run it, and the exact confirmation string must be typed.
+# (The private-repo plan has no Environment reviewers, so these two checks are the gate.)
 name: env-destroy
 on:
   workflow_dispatch:
@@ -29,6 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - name: Only the repository owner may run this workflow
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          [ "$ACTOR" = "$OWNER" ] || { echo "::error::$ACTOR may not run this workflow; only $OWNER can."; exit 1; }
       - name: Check the confirmation string
         env:
           CONFIRM: ${{ inputs.confirm }}
@@ -39,7 +46,7 @@ jobs:
     needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: infra-${{ inputs.environment }}-destroy   # pauses until an approver signs off
+    environment: infra-${{ inputs.environment }}-destroy   # holds the environment's variables; no reviewers on this plan
     permissions:
       contents: read
       id-token: write
