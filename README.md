@@ -30,6 +30,13 @@ envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo
 `AZURE_CLIENT_ID_CI_PLAN` · `AZURE_CLIENT_ID_INFRA_UAT` · `AZURE_CLIENT_ID_INFRA_UAT_DESTROY` · `AZURE_CLIENT_ID_INFRA_PROD` · `AZURE_CLIENT_ID_INFRA_PROD_DESTROY`
 (các giá trị client id lấy từ output `github_identity_client_ids` của bootstrap).
 
+`AZURE_CLIENT_ID_CHART_PUSH` (identity đẩy Helm chart) đặt ở repo **shp-platform-templates**; `AZURE_CLIENT_ID_ACR_PUSH` đặt ở repo ứng dụng.
+
+**Azure chỉ tin nhánh `main`:**
+- Identity theo `ref` (`ci-plan`: repo này; `acr-push`: repo ứng dụng) chỉ nhận token từ `refs/heads/main`. Nhánh khác, PR hay fork có subject khác nên Azure từ chối.
+- Identity theo Environment (`infra-<env>`, `infra-<env>-destroy`, `release-chart`) dựa vào *deployment branch policy*: Environment chỉ cho nhánh `main` (riêng `release-chart` chỉ cho tag `chart-v*`). Job trên nhánh khác bị GitHub từ chối trước khi xin được token. Đã kiểm chứng trên gói hiện tại bằng một nhánh thử.
+- Không dùng cho CI trên pull request: PR chỉ kiểm tĩnh, không đăng nhập Azure.
+
 Cho bước ENV-01 (Argo CD đọc repo private): một GitHub App **chỉ đọc** (`Contents: Read`, `Metadata: Read`) cài trên `shp-gitops` và `shp-platform-templates`.
 Variable `ARGOCD_REPO_APP_ID`, `ARGOCD_REPO_APP_INSTALLATION_ID`; secret `ARGOCD_REPO_APP_PRIVATE_KEY`.
 Identity `AZURE_CLIENT_ID_INFRA_<ENV>` cần thêm quyền chạy `az aks command invoke` và quản trị cụm (ví dụ vai trò *Azure Kubernetes Service RBAC Cluster Admin* trên cụm của môi trường đó).

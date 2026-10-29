@@ -23,6 +23,11 @@ variable "infra_repo" {
   default = "shp-infra"
 }
 
+variable "templates_repo" {
+  type    = string
+  default = "shp-platform-templates"
+}
+
 variable "budget_alert_emails" {
   description = "Email nhận cảnh báo ngân sách."
   type        = list(string)
