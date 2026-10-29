@@ -13,8 +13,10 @@ envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo
 
 ## Quy trình
 1. **Một lần** (SA, bằng tay): chạy `bootstrap/` (xem `bootstrap/README.md`), cấu hình GitHub variables và Environments.
-2. **Dựng môi trường:** Actions → `env-provision` → chọn `uat`/`prod` → xem kế hoạch → **duyệt ở Environment `infra-<env>`** → apply.
-3. **Hủy môi trường:** Actions → `env-destroy` → gõ `destroy-<env>` → **duyệt ở Environment `infra-<env>-destroy`**.
+2. **Dựng môi trường:** Actions → `env-provision` → chọn `uat`/`prod` → plan → apply → cài Argo CD và áp dụng `shp-gitops/bootstrap/root-<env>.yaml` (ENV-01). Từ đây Argo CD tự dựng mọi thứ trong cụm từ `shp-gitops`.
+3. **Hủy môi trường:** Actions → `env-destroy` → gõ `destroy-<env>`.
+
+**Ai được chạy:** chỉ chủ repo. Gói GitHub hiện tại không cho đặt người duyệt Environment ở repo private, nên mỗi workflow tự kiểm tra `github.triggering_actor` và dừng ngay nếu không phải chủ repo. Muốn xem kế hoạch trước khi apply: chạy `ci` trên PR, hoặc đọc phần Summary của job `plan`.
 4. Mọi thay đổi code hạ tầng đi qua PR; `ci` chỉ kiểm tĩnh (fmt, validate, tflint, Trivy), **không apply**.
 
 ## Bảo mật (mặc định)
@@ -28,12 +30,16 @@ envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo
 `AZURE_CLIENT_ID_CI_PLAN` · `AZURE_CLIENT_ID_INFRA_UAT` · `AZURE_CLIENT_ID_INFRA_UAT_DESTROY` · `AZURE_CLIENT_ID_INFRA_PROD` · `AZURE_CLIENT_ID_INFRA_PROD_DESTROY`
 (các giá trị client id lấy từ output `github_identity_client_ids` của bootstrap).
 
+Cho bước ENV-01 (Argo CD đọc repo private): một GitHub App **chỉ đọc** (`Contents: Read`, `Metadata: Read`) cài trên `shp-gitops` và `shp-platform-templates`.
+Variable `ARGOCD_REPO_APP_ID`, `ARGOCD_REPO_APP_INSTALLATION_ID`; secret `ARGOCD_REPO_APP_PRIVATE_KEY`.
+Identity `AZURE_CLIENT_ID_INFRA_<ENV>` cần thêm quyền chạy `az aks command invoke` và quản trị cụm (ví dụ vai trò *Azure Kubernetes Service RBAC Cluster Admin* trên cụm của môi trường đó).
+
 ## Đã có / còn thiếu
 | Đã có (đã `fmt` + `validate` + tflint + Trivy sạch) | Còn lại (backlog) |
 |---|---|
 | bootstrap, network, monitoring, Key Vault, AKS (3 node pool), 2 stack, 4 workflow | IAC-09..14 module dữ liệu (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search), IAC-15 workload identity theo service, IAC-16 Entra app, IAC-18/19 Defender + Azure OpenAI |
 | | OBS-01: nối Managed Prometheus (cần data collection rule), Grafana |
-| | ENV-01: bước cài Argo CD + GitOps + seed trong `env-provision` (cần repo GitOps) |
+| ENV-01: `env-provision` cài Argo CD và giao cụm cho GitOps (chưa chạy thử trên Azure thật) | ENV-01 phần còn lại: nạp dữ liệu tổng hợp, smoke test sau khi dựng |
 
 > **Chưa `apply` lên Azure** (theo quy tắc dự án) và chưa chạy workflow trên GitHub thật. Plugin `azurerm` của tflint chưa chạy được ở nơi viết code; CI sẽ chạy.
 > Chi phí: AKS tính tiền theo giờ khi môi trường tồn tại; `cost-guard` cảnh báo môi trường quá TTL. Ước tính chi tiết: task PRD-05.
