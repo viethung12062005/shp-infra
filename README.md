@@ -6,7 +6,9 @@ Hạ tầng Azure bằng Terraform cho Smart Hospital Platform. Quyết định:
 
 ```
 bootstrap/        tài nguyên thường trực: state, ACR, identity GitHub OIDC, ngân sách   (chạy tay MỘT lần)
-modules/          network · monitoring · keyvault · aks · environment (ghép các module trên)
+modules/          network · monitoring · keyvault · aks · environment (ghép các module dưới đây)
+                  dữ liệu: postgres · mongodb · redis · servicebus · storage · search · private-endpoint
+                  danh tính và giám sát: workload-identity · observability (Managed Prometheus + Grafana)
 envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo vệ (purge protection, SKU AKS)
 .github/workflows ci · env-provision · env-destroy · cost-guard
 ```
@@ -24,6 +26,29 @@ envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo
 - AKS: Entra ID RBAC (tắt tài khoản cục bộ), Workload Identity, Azure CNI Overlay + Cilium, Key Vault CSI, trải 3 availability zone, **API server chỉ cho dải IP khai báo** (`authorized_ip_ranges`, bắt buộc, cấm `0.0.0.0/0`).
 - Key Vault: RBAC, không public, private endpoint; prod bật purge protection. Tên có hậu tố ngẫu nhiên để dựng lại được.
 - Bootstrap bằng `az aks command invoke` (không mở API server cho runner).
+
+## Dịch vụ dữ liệu, hàng đợi và giám sát
+
+Thiết kế gốc: ADR-0008, ADR-0014 và `detailed-design/05, 06, 13` (repo ứng dụng). Module `environment` dựng tất cả cùng cụm AKS.
+
+| Module | Dịch vụ Azure | Ai dùng | Bảo mật |
+|---|---|---|---|
+| `postgres` | PostgreSQL Flexible Server, database `scheduling` | scheduling | Trong VNet, không địa chỉ công khai, chỉ đăng nhập Entra ID (tắt mật khẩu), mở rộng `btree_gist` |
+| `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, tắt truy cập công khai, mỗi service một người dùng Entra chỉ `readWrite` trên database của mình |
+| `redis` | Azure Managed Redis | gateway (giới hạn tốc độ), scheduling (cache slot) | Private endpoint, tắt khóa truy cập, chỉ Entra ID |
+| `servicebus` | Service Bus, topic `shp-events`, 7 subscription có bộ lọc, DLQ sau 5 lần giao | tất cả (phát), consumer (nhận) | Tắt SAS key, Entra ID, TLS 1.2; Premium có private endpoint |
+| `storage` | Hai storage account: tài liệu (`documents`, `quarantine`, `kb`, `mlops`) và audit WORM | document, ai, ml, audit | Tắt shared key, private endpoint, versioning và xóa mềm 14 ngày; audit bất biến (prod 10 năm, khóa) |
+| `search` | Azure AI Search | ai | Tắt khóa API, private endpoint |
+| `workload-identity` | Mỗi service một managed identity + federated credential | tất cả | Pod đăng nhập bằng token ServiceAccount, không có mật khẩu |
+| `observability` | Managed Prometheus (thu metric AKS, 4 cảnh báo hạ tầng) và Managed Grafana | SA, DevOps | Grafana chỉ đăng nhập Entra ID, không phát API key |
+
+**Sau khi dựng (việc thủ công còn lại, vì là mặt phẳng dữ liệu nên Terraform không làm được):**
+1. PostgreSQL: dùng `workload_identity_client_ids` (output của stack) để tạo vai trò Entra cho `scheduling` trong database (`pgaadauth_create_principal`), rồi cấp quyền tối thiểu. Job migration của scheduling làm bước này.
+2. Điền `workloadIdentity.clientId` và `serviceAccount.name: <service>` vào values từng service trong `shp-gitops` (tên ServiceAccount trùng tên service, namespace `shp-apps`).
+3. Service Bus: định dạng thuộc tính `type` dùng trong bộ lọc phải khớp cách thư viện phát event ghi CloudEvents (xem `13-events.md`); kiểm bằng một event thử trước khi bật consumer.
+4. Mongo: tài khoản quản trị gốc (`shpadmin`) chỉ nằm trong state, không service nào dùng. Sau khi dựng, tắt `NativeAuth` ở prod khi đã xác nhận đăng nhập Entra chạy được.
+
+**Chi phí khi dựng môi trường (theo giờ, ước lượng, tính bằng đơn giá công khai):** Service Bus Premium là khoản lớn nhất (khoảng 0,9 USD/giờ), tiếp theo Cosmos DB MongoDB vCore M10 và AI Search Basic. Môi trường thử sống tối đa 8 giờ (cost-guard) nên phần này đáng kể nhưng có giới hạn. Muốn rẻ hơn khi chưa cần private endpoint cho hàng đợi: đặt `messaging_sku = "Standard"` (namespace mở cổng công khai, chỉ Entra ID, event mang mã bệnh nhân nên **không dùng cho dữ liệu thật**).
 
 ## GitHub variables cần có (không phải secret)
 `AZURE_TENANT_ID` · `AZURE_SUBSCRIPTION_ID` · `TFSTATE_STORAGE_ACCOUNT` · `ACR_NAME` · `ADMIN_IP_RANGES` (JSON, ví dụ `["203.0.113.5/32"]`) ·
