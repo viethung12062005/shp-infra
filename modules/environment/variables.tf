@@ -46,3 +46,30 @@ variable "kubernetes_version" {
   type    = string
   default = null
 }
+
+variable "entra_admin" {
+  description = "Quản trị viên Entra ID của PostgreSQL (danh tính chạy Terraform và migration). Máy chủ không có mật khẩu."
+  type = object({
+    object_id = string
+    name      = string
+    type      = string
+  })
+}
+
+variable "messaging_sku" {
+  description = "Premium (private endpoint, ~0,9 USD/giờ/đơn vị, môi trường thử chỉ sống vài giờ) hoặc Standard (rẻ, cổng công khai chỉ Entra ID)."
+  type        = string
+  default     = "Premium"
+}
+
+variable "grafana_admin_principal_ids" {
+  description = "Người/nhóm Entra quản trị Grafana."
+  type        = map(string)
+  default     = {}
+}
+
+variable "grafana_viewer_principal_ids" {
+  description = "Người/nhóm Entra chỉ xem dashboard Grafana."
+  type        = map(string)
+  default     = {}
+}

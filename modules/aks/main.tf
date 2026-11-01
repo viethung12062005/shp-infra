@@ -61,6 +61,9 @@ resource "azurerm_kubernetes_cluster" "this" {
     msi_auth_for_monitoring_enabled = true
   }
 
+  # Managed Prometheus: bật agent thu metric; quy tắc thu và đích nằm ở module observability
+  monitor_metrics {}
+
   api_server_access_profile {
     authorized_ip_ranges = var.authorized_ip_ranges
   }

@@ -18,4 +18,15 @@ module "environment" {
   ttl_hours            = var.ttl_hours
   enable_ai_pool       = var.enable_ai_pool
   authorized_ip_ranges = var.authorized_ip_ranges
+
+  # Danh tính chạy Terraform là quản trị viên Entra của PostgreSQL (máy chủ không có mật khẩu)
+  entra_admin = {
+    object_id = data.azurerm_client_config.current.object_id
+    name      = "id-shp-infra-uat"
+    type      = "ServicePrincipal"
+  }
+
+  messaging_sku                = var.messaging_sku
+  grafana_admin_principal_ids  = var.grafana_admin_principal_ids
+  grafana_viewer_principal_ids = var.grafana_viewer_principal_ids
 }
