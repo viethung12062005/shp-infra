@@ -19,6 +19,16 @@ output "workload_identity_client_ids" {
   value       = module.environment.workload_identity_client_ids
 }
 
+output "workload_identity_names" {
+  description = "service -> tên managed identity; scheduling dùng làm SPRING_DATASOURCE_USERNAME trong shp-gitops."
+  value       = module.environment.workload_identity_names
+}
+
+output "postgres_fqdn" {
+  description = "Host PostgreSQL, dùng trong SPRING_DATASOURCE_URL của scheduling (shp-gitops)."
+  value       = module.environment.postgres_fqdn
+}
+
 output "grafana_endpoint" {
   value = module.environment.grafana_endpoint
 }
