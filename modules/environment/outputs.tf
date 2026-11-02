@@ -18,3 +18,8 @@ output "workload_identity_client_ids" {
   description = "service -> clientId, điền vào workloadIdentity.clientId trong shp-gitops."
   value       = module.identities.client_ids
 }
+
+output "workload_identity_names" {
+  description = "service -> tên managed identity; scheduling dùng làm SPRING_DATASOURCE_USERNAME trong shp-gitops."
+  value       = module.identities.names
+}
