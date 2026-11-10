@@ -6,3 +6,4 @@
 !*.tfvars.example
 crash.log
 .terraform.tfstate.lock.info
+bootstrap.tfvars

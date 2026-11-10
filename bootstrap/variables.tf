@@ -47,3 +47,36 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "create_role_assignments" {
+  description = <<-EOT
+    Tạo role assignment cho các identity GitHub. Đặt false ở môi trường mà tài khoản chạy Terraform bị chặn
+    Microsoft.Authorization/*/Write (ví dụ sandbox FSO-SandboxOps, cấm mọi thao tác ghi phân quyền).
+    Khi false, output required_role_assignments liệt kê đúng lệnh az cần chạy bằng tài khoản có quyền Owner.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "manage_state_container" {
+  description = <<-EOT
+    Tạo container "tfstate". Container đi qua data plane nên cần dataActions của Storage (Storage Blob Data
+    Contributor); sandbox chỉ có actions "*" nên đặt false và tạo container bằng tài khoản có quyền dữ liệu.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "acr_sku" {
+  description = <<-EOT
+    SKU của Azure Container Registry. Basic (~5 USD/tháng) đủ cho CI đẩy image và chart OCI; retention policy
+    cho image không gắn tag là tính năng Premium (IAC-02 để lại khi nâng SKU). Standard ~20 USD/tháng.
+  EOT
+  type        = string
+  default     = "Standard"
+
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.acr_sku)
+    error_message = "acr_sku phải là Basic, Standard hoặc Premium."
+  }
+}
