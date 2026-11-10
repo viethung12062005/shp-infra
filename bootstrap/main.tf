@@ -43,7 +43,11 @@ resource "azurerm_storage_account" "tfstate" {
   }
 }
 
+# Container state tạo qua data plane (Entra) nên cần role "Storage Blob Data Contributor"; môi trường bị chặn
+# Microsoft.Authorization/*/Write (sandbox) không tự cấp được role đó. Đặt manage_state_container=false và tạo
+# container bằng tài khoản có quyền dữ liệu (xem README).
 resource "azurerm_storage_container" "tfstate" {
+  count                 = var.manage_state_container ? 1 : 0
   name                  = "tfstate"
   storage_account_id    = azurerm_storage_account.tfstate.id
   container_access_type = "private"
@@ -54,7 +58,7 @@ resource "azurerm_container_registry" "acr" {
   name                = "acrshp${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.shared.name
   location            = azurerm_resource_group.shared.location
-  sku                 = "Standard"
+  sku                 = var.acr_sku
   admin_enabled       = false
   tags                = local.tags
 }
@@ -95,47 +99,6 @@ resource "azurerm_federated_identity_credential" "github" {
   issuer              = local.github_issuer
   subject             = each.value.subject
   audience            = ["api://AzureADTokenExchange"]
-}
-
-# Quyền tối thiểu
-resource "azurerm_role_assignment" "acr_push" {
-  for_each = toset(["acr-push", "chart-push"])
-
-  scope                = azurerm_container_registry.acr.id
-  role_definition_name = "AcrPush"
-  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
-}
-
-resource "azurerm_role_assignment" "state_rw" {
-  for_each = toset(["infra-uat", "infra-uat-destroy", "infra-prod", "infra-prod-destroy", "ci-plan"])
-
-  scope                = azurerm_storage_account.tfstate.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
-}
-
-resource "azurerm_role_assignment" "plan_reader" {
-  scope                = "/subscriptions/${var.subscription_id}"
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.github["ci-plan"].principal_id
-}
-
-# Identity dựng môi trường cần tạo tài nguyên + gán quyền (RBAC): Contributor + User Access Administrator
-# giới hạn ở subscription; thu hẹp theo resource group khi môi trường đã được tách subscription (NFR-D4).
-resource "azurerm_role_assignment" "infra_contributor" {
-  for_each = toset(["infra-uat", "infra-uat-destroy", "infra-prod", "infra-prod-destroy"])
-
-  scope                = "/subscriptions/${var.subscription_id}"
-  role_definition_name = "Contributor"
-  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
-}
-
-resource "azurerm_role_assignment" "infra_rbac_admin" {
-  for_each = toset(["infra-uat", "infra-uat-destroy", "infra-prod", "infra-prod-destroy"])
-
-  scope                = "/subscriptions/${var.subscription_id}"
-  role_definition_name = "Role Based Access Control Administrator"
-  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
 }
 
 # ---------- Ngân sách ----------
