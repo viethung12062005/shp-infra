@@ -24,3 +24,36 @@ Sau khi apply:
 
 Lưu ý: identity dựng môi trường có `Contributor` + `Role Based Access Control Administrator` ở phạm vi subscription (cần để tạo tài nguyên và gán quyền).
 Khi tách prod sang subscription riêng (NFR-D4), thu hẹp phạm vi này.
+
+## Môi trường bị chặn `Microsoft.Authorization/*/Write` (sandbox)
+
+Một số subscription (ví dụ sandbox `FSO-SandboxOps`) cho phép tạo tài nguyên nhưng **cấm mọi thao tác ghi phân quyền**
+và **không cấp `dataActions`**. Kiểm tra bằng:
+
+```bash
+az role definition list --name <role> -o json                     # xem notActions / dataActions
+az rest --url "https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
+```
+
+Ở môi trường đó, đặt trong `bootstrap.tfvars`:
+
+```hcl
+create_role_assignments = false   # không tạo role assignment
+manage_state_container  = false   # không tạo container qua Entra (thiếu dataActions)
+acr_sku                 = "Basic" # tuỳ ngân sách
+```
+
+`terraform apply` khi đó tạo 19 tài nguyên: resource group, storage account (versioning, soft delete 30 ngày, tắt shared
+key), ACR (tắt admin), 6 managed identity + federated credential cho GitHub OIDC, và ngân sách tháng.
+
+Hai việc còn lại cần tài khoản **Owner** trên subscription (một lần):
+
+```bash
+# 1) Phân quyền: lấy đúng lệnh từ output
+terraform output -json required_role_assignments
+
+# 2) Container chứa state: dùng tài khoản có "Storage Blob Data Contributor" trên storage account
+az storage container create --account-name <tfstate_storage_account> --name tfstate --auth-mode login
+```
+
+Sau đó đặt GitHub variables theo `../README.md`; identity GitHub chỉ dùng được sau bước 1.
