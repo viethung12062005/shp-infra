@@ -86,7 +86,7 @@ module "private_endpoint" {
 }
 
 resource "azurerm_role_assignment" "sender" {
-  for_each = var.sender_principal_ids
+  for_each = var.create_role_assignments ? var.sender_principal_ids : {}
 
   scope                = azurerm_servicebus_topic.events.id
   role_definition_name = "Azure Service Bus Data Sender"
@@ -94,7 +94,7 @@ resource "azurerm_role_assignment" "sender" {
 }
 
 resource "azurerm_role_assignment" "receiver" {
-  for_each = var.receiver_principal_ids
+  for_each = var.create_role_assignments ? var.receiver_principal_ids : {}
 
   scope                = azurerm_servicebus_subscription.consumer[each.key].id
   role_definition_name = "Azure Service Bus Data Receiver"

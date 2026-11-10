@@ -54,3 +54,22 @@ variable "audit_writer_principal_ids" {
   type        = map(string)
   default     = {}
 }
+
+variable "create_role_assignments" {
+  description = <<-EOT
+    Tạo role assignment của module. Đặt false ở subscription bị chặn Microsoft.Authorization/*/Write
+    (sandbox FSO-SandboxOps): hạ tầng vẫn tạo được, phân quyền do tài khoản Owner chạy sau bằng
+    `az role assignment create`.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "create_containers" {
+  description = <<-EOT
+    Tạo container qua Entra (data plane). Đặt false ở subscription không có dataActions
+    (sandbox): container do tài khoản có "Storage Blob Data Contributor" tạo sau bằng az CLI.
+  EOT
+  type        = bool
+  default     = true
+}
