@@ -6,7 +6,7 @@ variable "private_endpoints_subnet_id" { type = string }
 variable "private_dns_zone_id" { type = string }
 
 variable "sku_name" {
-  description = "Balanced_B0 cho môi trường thử; Balanced_B5 trở lên cho prod."
+  description = "Balanced_B0 for test environments; Balanced_B5 or larger for prod."
   type        = string
   default     = "Balanced_B0"
 }
@@ -17,6 +17,6 @@ variable "high_availability_enabled" {
 }
 
 variable "client_principal_ids" {
-  description = "Danh tính được đọc/ghi Redis qua Entra ID (gateway: đếm giới hạn tốc độ; scheduling: cache slot trống)."
+  description = "Identities allowed to read/write Redis through Entra ID (gateway: rate-limit counters; scheduling: free-slot cache)."
   type        = map(string)
 }

@@ -1,5 +1,5 @@
-# Hai storage account (05-storage-audit-blob.md): tài liệu lâm sàng và audit bất biến. Tắt khóa chung, chỉ Entra ID,
-# chỉ truy cập qua private endpoint.
+# Two storage accounts (05-storage-audit-blob.md): clinical documents and immutable audit. Shared keys off, Entra ID only,
+# reachable only through private endpoints.
 resource "random_string" "suffix" {
   length  = 4
   upper   = false
@@ -7,7 +7,7 @@ resource "random_string" "suffix" {
 }
 
 locals {
-  # Tên storage account: 3-24 ký tự, chữ thường và số
+  # Storage account name: 3-24 characters, lower-case letters and digits
   account_names = {
     docs  = "stshpdocs${random_string.suffix.result}${substr(sha1(var.name_prefix), 0, 6)}"
     audit = "stshpaudit${random_string.suffix.result}${substr(sha1(var.name_prefix), 0, 6)}"
@@ -40,7 +40,7 @@ resource "azurerm_storage_account" "this" {
   }
 
   blob_properties {
-    # docs: lưu phiên bản + xóa mềm 14 ngày. audit: chống sửa/xóa bằng chính sách bất biến, không bật versioning.
+    # docs: versioning + 14-day soft delete. audit: protected from change/deletion by an immutability policy, no versioning.
     versioning_enabled = each.key == "docs"
 
     dynamic "delete_retention_policy" {
@@ -92,7 +92,7 @@ resource "azurerm_storage_container" "audit" {
   depends_on = [module.private_endpoint]
 }
 
-# WORM: bản gốc audit không ai xóa/sửa được trong thời gian khóa (kể cả Owner), vẫn nối thêm được (append blob).
+# WORM: nobody (not even Owner) can delete or change the original audit records during the lock period; appending still works (append blob).
 resource "azurerm_storage_container_immutability_policy" "audit" {
   storage_container_resource_manager_id = azurerm_storage_container.audit.id
   immutability_period_in_days           = var.audit_retention_days
@@ -100,7 +100,7 @@ resource "azurerm_storage_container_immutability_policy" "audit" {
   locked                                = var.audit_retention_locked
 }
 
-# Tầng Hot -> Cool 30 ngày -> Cold 180 ngày cho tài liệu (ADR-0014, mục tối ưu Blob)
+# Tiers Hot -> Cool after 30 days -> Cold after 180 days for documents (ADR-0014, Blob optimization section)
 resource "azurerm_storage_management_policy" "docs" {
   storage_account_id = azurerm_storage_account.this["docs"].id
 
@@ -128,7 +128,7 @@ resource "azurerm_security_center_storage_defender" "docs" {
   malware_scanning_on_upload_cap_gb_per_month = 100
 }
 
-# ---- quyền dữ liệu theo nguyên tắc tối thiểu, gắn ở mức container
+# ---- data access by least privilege, assigned at container level
 resource "azurerm_role_assignment" "documents" {
   for_each = {
     for p in setproduct(keys(var.document_writer_principal_ids), ["documents", "quarantine"]) : "${p[0]}-${p[1]}" => { who = p[0], container = p[1] }
@@ -163,7 +163,7 @@ resource "azurerm_role_assignment" "audit" {
   principal_id         = each.value
 }
 
-# Nhật ký truy cập blob (đọc/ghi/xóa) vào Log Analytics để dò truy cập bất thường
+# Blob access logs (read/write/delete) go to Log Analytics to trace unusual access
 resource "azurerm_monitor_diagnostic_setting" "blob" {
   for_each = azurerm_storage_account.this
 

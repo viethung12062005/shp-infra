@@ -1,4 +1,4 @@
-# Một private endpoint + bản ghi DNS riêng. Dùng chung cho mọi dịch vụ dữ liệu để không dịch vụ nào mở ra Internet.
+# One private endpoint + its private DNS record. Shared by every data service so that none of them is exposed to the Internet.
 resource "azurerm_private_endpoint" "this" {
   name                = var.name
   resource_group_name = var.resource_group_name

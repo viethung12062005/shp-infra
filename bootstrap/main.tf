@@ -1,5 +1,5 @@
-# Tài nguyên THƯỜNG TRỰC (rẻ, không chứa dữ liệu bệnh nhân): state, ACR, identity cho GitHub OIDC, ngân sách.
-# Chạy MỘT lần bằng tay bởi SA; sau đó chuyển state vào chính storage account này (xem README).
+# ALWAYS-ON resources (cheap, no patient data): state, ACR, identities for GitHub OIDC, budget.
+# Run ONCE by hand by the SA; then move the state into this same storage account (see README).
 
 data "azurerm_client_config" "current" {}
 
@@ -43,9 +43,9 @@ resource "azurerm_storage_account" "tfstate" {
   }
 }
 
-# Container state tạo qua data plane (Entra) nên cần role "Storage Blob Data Contributor"; môi trường bị chặn
-# Microsoft.Authorization/*/Write (sandbox) không tự cấp được role đó. Đặt manage_state_container=false và tạo
-# container bằng tài khoản có quyền dữ liệu (xem README).
+# The state container is created through the data plane (Entra), so it needs the "Storage Blob Data Contributor" role;
+# an environment that blocks Microsoft.Authorization/*/Write (sandbox) cannot grant itself that role. Set
+# manage_state_container=false and create the container with an account that has data access (see README).
 resource "azurerm_storage_container" "tfstate" {
   count                 = var.manage_state_container ? 1 : 0
   name                  = "tfstate"
@@ -63,22 +63,22 @@ resource "azurerm_container_registry" "acr" {
   tags                = local.tags
 }
 
-# ---------- Identity cho GitHub Actions (OIDC, không secret) ----------
+# ---------- Identities for GitHub Actions (OIDC, no secret) ----------
 locals {
   github_issuer = "https://token.actions.githubusercontent.com"
   identities = {
-    # quyền đọc: bước plan của env-provision và cost-guard. Cả hai chạy từ nhánh main, không có Environment
-    # (CI trên pull request chỉ kiểm tĩnh, không đăng nhập Azure).
+    # read access: the plan step of env-provision and cost-guard. Both run from the main branch, with no Environment
+    # (CI on pull requests only runs static checks and never signs in to Azure).
     "ci-plan" = { subject = "repo:${var.github_owner}/${var.infra_repo}:ref:refs/heads/main" }
-    # dựng/hủy môi trường: chỉ khi job chạy trong GitHub Environment tương ứng. Mỗi Environment bị giới hạn ở nhánh
-    # main (deployment branch policy), nên nhánh khác không xin được token mang subject này.
+    # provision/destroy an environment: only when the job runs in the matching GitHub Environment. Each Environment is
+    # limited to the main branch (deployment branch policy), so another branch cannot get a token with this subject.
     "infra-uat"          = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-uat" }
     "infra-uat-destroy"  = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-uat-destroy" }
     "infra-prod"         = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-prod" }
     "infra-prod-destroy" = { subject = "repo:${var.github_owner}/${var.infra_repo}:environment:infra-prod-destroy" }
-    # đẩy image: chỉ từ nhánh main của repo ứng dụng (subject theo ref, không có Environment)
+    # push images: only from the main branch of the application repo (subject by ref, no Environment)
     "acr-push" = { subject = "repo:${var.github_owner}/${var.app_repo}:ref:refs/heads/main" }
-    # đẩy Helm chart: workflow release-chart ở repo templates, Environment release-chart chỉ nhận tag chart-v*
+    # push the Helm chart: the release-chart workflow in the templates repo; Environment release-chart only accepts chart-v* tags
     "chart-push" = { subject = "repo:${var.github_owner}/${var.templates_repo}:environment:release-chart" }
   }
 }
@@ -101,7 +101,7 @@ resource "azurerm_federated_identity_credential" "github" {
   audience            = ["api://AzureADTokenExchange"]
 }
 
-# ---------- Ngân sách ----------
+# ---------- Budget ----------
 resource "azurerm_consumption_budget_subscription" "monthly" {
   name            = "budget-shp-monthly"
   subscription_id = "/subscriptions/${var.subscription_id}"

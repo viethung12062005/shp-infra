@@ -1,14 +1,14 @@
-# Giám sát: Azure Managed Prometheus nhận metric từ AKS, Azure Managed Grafana làm dashboard (NFR-OBS, task OBS-01..03).
-# Log và trace nằm ở Log Analytics / Application Insights (module monitoring). Không có dữ liệu bệnh nhân trong metric:
-# Prometheus chỉ thu metric hạ tầng và ứng dụng (độ trễ, lỗi, số lượng), nhãn không chứa định danh người bệnh.
+# Monitoring: Azure Managed Prometheus receives metrics from AKS, Azure Managed Grafana serves the dashboards (NFR-OBS, tasks OBS-01..03).
+# Logs and traces live in Log Analytics / Application Insights (monitoring module). No patient data in metrics:
+# Prometheus only collects infrastructure and application metrics (latency, errors, counts); labels carry no patient identifier.
 
-# ---- Managed Prometheus: thu metric từ cụm vào Azure Monitor workspace
+# ---- Managed Prometheus: collects metrics from the cluster into the Azure Monitor workspace
 resource "azurerm_monitor_data_collection_endpoint" "prometheus" {
   name                          = "dce-${var.name_prefix}-prom"
   resource_group_name           = var.resource_group_name
   location                      = var.location
   kind                          = "Linux"
-  public_network_access_enabled = true # agent trong AKS gửi qua Internet của Azure; xác thực bằng danh tính của cụm
+  public_network_access_enabled = true # the agent in AKS sends over the Azure network; authenticated with the cluster identity
   tags                          = var.tags
 }
 
@@ -46,14 +46,14 @@ resource "azurerm_monitor_data_collection_rule_association" "prometheus" {
   data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus.id
 }
 
-# Tên bắt buộc "configurationAccessEndpoint": agent lấy cấu hình scrape qua endpoint này
+# The name "configurationAccessEndpoint" is mandatory: the agent fetches its scrape configuration through this endpoint
 resource "azurerm_monitor_data_collection_rule_association" "prometheus_endpoint" {
   name                        = "configurationAccessEndpoint"
   target_resource_id          = var.aks_id
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.prometheus.id
 }
 
-# ---- Cảnh báo hạ tầng (PromQL). Nhóm hành động tùy chọn; chưa có thì cảnh báo vẫn hiện trong Azure Monitor.
+# ---- Infrastructure alerts (PromQL). The action group is optional; without one the alerts still show in Azure Monitor.
 locals {
   rule_actions = var.action_group_id == null ? [] : [var.action_group_id]
 }
@@ -74,7 +74,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
     severity   = 2
     labels     = { team = "platform" }
     annotations = {
-      summary = "Pod trong ${var.apps_namespace} khởi động lại liên tục (CrashLoopBackOff)."
+      summary = "A pod in ${var.apps_namespace} keeps restarting (CrashLoopBackOff)."
     }
 
     dynamic "action" {
@@ -92,7 +92,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
     severity   = 2
     labels     = { team = "platform" }
     annotations = {
-      summary = "Deployment thiếu replica sẵn sàng quá 10 phút."
+      summary = "A Deployment has been short of ready replicas for more than 10 minutes."
     }
 
     dynamic "action" {
@@ -110,7 +110,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
     severity   = 3
     labels     = { team = "platform" }
     annotations = {
-      summary = "Container dùng trên 90% giới hạn bộ nhớ: nguy cơ OOMKilled."
+      summary = "A container uses more than 90% of its memory limit: risk of OOMKilled."
     }
 
     dynamic "action" {
@@ -128,7 +128,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
     severity   = 1
     labels     = { team = "platform" }
     annotations = {
-      summary = "Node không ở trạng thái Ready quá 5 phút."
+      summary = "A node has not been Ready for more than 5 minutes."
     }
 
     dynamic "action" {
@@ -140,7 +140,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
   }
 }
 
-# ---- Managed Grafana: đăng nhập bằng Entra ID, đọc metric Prometheus và log Azure Monitor bằng danh tính của chính nó
+# ---- Managed Grafana: sign-in with Entra ID; reads Prometheus metrics and Azure Monitor logs with its own identity
 resource "azurerm_dashboard_grafana" "this" {
   name                  = substr("graf-${var.name_prefix}", 0, 23)
   resource_group_name   = var.resource_group_name
@@ -149,7 +149,7 @@ resource "azurerm_dashboard_grafana" "this" {
   sku                   = "Standard"
   tags                  = var.tags
 
-  api_key_enabled                   = false # không phát API key; tích hợp dùng danh tính Entra
+  api_key_enabled                   = false # no API keys are issued; integrations use Entra identities
   deterministic_outbound_ip_enabled = false
   public_network_access_enabled     = var.grafana_public_network_access
   zone_redundancy_enabled           = false

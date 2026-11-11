@@ -1,8 +1,8 @@
-# Azure Service Bus: một topic `shp-events`, mỗi consumer một subscription có bộ lọc, dead-letter sau 5 lần giao
-# (13-events.md). Chỉ xác thực Entra ID (tắt SAS key), thứ tự theo subject bằng session.
+# Azure Service Bus: one topic `shp-events`, one filtered subscription per consumer, dead-letter after 5 deliveries
+# (13-events.md). Entra ID authentication only (SAS keys off), ordering by subject through sessions.
 locals {
   premium = var.sku == "Premium"
-  # Mỗi consumer chỉ nhận đúng các loại event của mình.
+  # Each consumer receives only its own event types.
   filters = { for name, types in var.subscriptions : name => "type IN (${join(", ", [for t in types : "'${t}'"])})" }
 }
 
@@ -50,8 +50,8 @@ resource "azurerm_servicebus_subscription" "consumer" {
   dead_lettering_on_filter_evaluation_error = true
 }
 
-# Subscription mới luôn có luật mặc định `$Default` (nhận tất cả). Provider không cho tạo/sửa luật trùng tên đó, nên ghi đè
-# nó bằng ARM (PUT là upsert) để mỗi consumer chỉ nhận đúng loại event của mình, không rò event của service khác.
+# A new subscription always has the default rule `$Default` (receives everything). The provider cannot create/change a rule with that
+# name, so it is overwritten through ARM (PUT is an upsert) so that each consumer receives only its own event types and no other service's events leak.
 resource "azurerm_resource_group_template_deployment" "filters" {
   name                = "sb-filters-${azurerm_servicebus_namespace.this.name}"
   resource_group_name = var.resource_group_name
@@ -115,14 +115,14 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
   }
 }
 
-# OBS-03: cảnh báo ngay khi có message nằm trong dead-letter queue.
+# OBS-03: alert as soon as a message sits in the dead-letter queue.
 resource "azurerm_monitor_metric_alert" "dead_letter" {
   count = var.action_group_id == null ? 0 : 1
 
   name                = "alert-${azurerm_servicebus_namespace.this.name}-dlq"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_servicebus_namespace.this.id]
-  description         = "Có message trong dead-letter queue của Service Bus."
+  description         = "There are messages in the Service Bus dead-letter queue."
   severity            = 2
   frequency           = "PT1M"
   window_size         = "PT5M"

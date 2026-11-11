@@ -7,7 +7,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   sku_tier            = var.sku_tier
   tags                = var.tags
 
-  # Danh tính và bảo mật
+  # Identity and security
   oidc_issuer_enabled               = true
   workload_identity_enabled         = true
   local_account_disabled            = true
@@ -40,7 +40,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     }
   }
 
-  # Azure CNI Overlay + Cilium (NetworkPolicy mặc định chặn, xem GOP-08)
+  # Azure CNI Overlay + Cilium (NetworkPolicy denies by default, see GOP-08)
   network_profile {
     network_plugin      = "azure"
     network_plugin_mode = "overlay"
@@ -61,7 +61,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     msi_auth_for_monitoring_enabled = true
   }
 
-  # Managed Prometheus: bật agent thu metric; quy tắc thu và đích nằm ở module observability
+  # Managed Prometheus: enables the metrics agent; scrape rules and the destination live in the observability module
   monitor_metrics {}
 
   api_server_access_profile {
@@ -114,7 +114,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai" {
   }
 }
 
-# Kéo image từ ACR bằng danh tính của kubelet (không dùng admin/user-pass)
+# Pull images from ACR with the kubelet identity (no admin user/password)
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = var.acr_id
   role_definition_name = "AcrPull"

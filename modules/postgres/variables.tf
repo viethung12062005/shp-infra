@@ -5,14 +5,14 @@ variable "tags" { type = map(string) }
 variable "tenant_id" { type = string }
 
 variable "delegated_subnet_id" {
-  description = "Subnet được ủy quyền cho PostgreSQL Flexible Server (máy chủ nằm trong VNet, không có địa chỉ công khai)."
+  description = "Subnet delegated to PostgreSQL Flexible Server (the server lives in the VNet and has no public address)."
   type        = string
 }
 
 variable "private_dns_zone_id" { type = string }
 
 variable "entra_admin" {
-  description = "Quản trị viên Entra ID của máy chủ (danh tính chạy Terraform/migration). Không dùng mật khẩu."
+  description = "Entra ID administrator of the server (the identity that runs Terraform/migrations). No password is used."
   type = object({
     object_id = string
     name      = string
@@ -21,7 +21,7 @@ variable "entra_admin" {
 }
 
 variable "sku_name" {
-  description = "B_Standard_B1ms cho môi trường thử; GP_Standard_D2ds_v5 trở lên khi đo hiệu năng/prod."
+  description = "B_Standard_B1ms for test environments; GP_Standard_D2ds_v5 or larger for performance measurement and prod."
   type        = string
   default     = "B_Standard_B1ms"
 }
@@ -47,17 +47,17 @@ variable "geo_redundant_backup" {
 }
 
 variable "high_availability" {
-  description = "ZoneRedundant cho prod; null = tắt."
+  description = "ZoneRedundant for prod; null = off."
   type        = string
   default     = null
   validation {
     condition     = var.high_availability == null || contains(["ZoneRedundant", "SameZone"], coalesce(var.high_availability, "ZoneRedundant"))
-    error_message = "high_availability phải là null, ZoneRedundant hoặc SameZone."
+    error_message = "high_availability must be null, ZoneRedundant or SameZone."
   }
 }
 
 variable "databases" {
-  description = "Database tạo sẵn. ADR-0014: PostgreSQL chỉ còn phục vụ scheduling."
+  description = "Databases created up front. ADR-0014: PostgreSQL now serves scheduling only."
   type        = list(string)
   default     = ["scheduling"]
 }

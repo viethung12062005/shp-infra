@@ -1,5 +1,5 @@
-# Phân quyền tối thiểu cho 6 identity GitHub (IAC-03). Tách riêng để môi trường bị chặn
-# Microsoft.Authorization/*/Write vẫn tạo được hạ tầng; xem var.create_role_assignments.
+# Least-privilege role assignments for the 6 GitHub identities (IAC-03). Kept separate so an environment that blocks
+# Microsoft.Authorization/*/Write can still create the infrastructure; see var.create_role_assignments.
 
 locals {
   subscription_scope = "/subscriptions/${var.subscription_id}"

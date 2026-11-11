@@ -9,7 +9,7 @@ variable "address_space" {
 }
 
 variable "private_dns_zones" {
-  description = "Private DNS zone cho private endpoint của các dịch vụ dữ liệu (thêm dần khi gắn module dữ liệu)."
+  description = "Private DNS zones for the private endpoints of the data services (added as data modules are attached)."
   type        = list(string)
   default = [
     "privatelink.vaultcore.azure.net",

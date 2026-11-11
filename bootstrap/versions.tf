@@ -8,8 +8,8 @@ terraform {
 
 provider "azurerm" {
   features {}
-  # Storage account tắt shared key: thao tác container dùng Entra ID.
+  # The storage account has shared keys turned off: container operations use Entra ID.
   storage_use_azuread = true
-  # Subscription lấy từ biến môi trường ARM_SUBSCRIPTION_ID (không ghi vào code).
+  # The subscription comes from the environment variable ARM_SUBSCRIPTION_ID (never written into the code).
   subscription_id = var.subscription_id
 }

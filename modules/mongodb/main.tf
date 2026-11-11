@@ -1,13 +1,13 @@
-# Azure Cosmos DB for MongoDB (vCore) dùng chung cho clinical, document, ai, notification, ml (ADR-0008, ADR-0014).
-# Mỗi service một database và một người dùng Entra ID riêng. Chỉ truy cập qua private endpoint.
+# Azure Cosmos DB for MongoDB (vCore) shared by clinical, document, ai, notification, ml (ADR-0008, ADR-0014).
+# One database and one Entra ID user per service. Reachable only through the private endpoint.
 resource "random_string" "suffix" {
   length  = 4
   upper   = false
   special = false
 }
 
-# Tài khoản quản trị gốc bắt buộc khi tạo cụm. Mật khẩu chỉ nằm trong state (backend mã hóa, truy cập bằng Entra ID),
-# không xuất ra output và không service nào dùng; service đăng nhập bằng Entra ID.
+# The root administrator account is mandatory when creating the cluster. Its password exists only in the state (encrypted
+# backend, accessed with Entra ID); it is never an output and no service uses it — services sign in with Entra ID.
 resource "random_password" "admin" {
   length           = 40
   special          = true

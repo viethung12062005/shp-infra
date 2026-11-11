@@ -1,36 +1,36 @@
 # Module postgres
 
-PostgreSQL Flexible Server cho scheduling (ADR-0014): chỉ truy cập trong VNet, **chỉ đăng nhập bằng Entra ID** (`password_auth_enabled = false`).
-Service đăng nhập bằng token Workload Identity của managed identity `id-<prefix>-scheduling`
-(thiết kế: `smart-hospital-platform/docs/03-architecture/detailed-design/02-db-scheduling.md` §5).
+PostgreSQL Flexible Server for scheduling (ADR-0014): reachable only inside the VNet, **Entra ID sign-in only** (`password_auth_enabled = false`).
+The service signs in with the Workload Identity token of the managed identity `id-<prefix>-scheduling`
+(design: `smart-hospital-platform/docs/03-architecture/detailed-design/02-db-scheduling.md` §5).
 
-## Sau khi apply: tạo principal cho service
+## After apply: create the principal for the service
 
-Terraform tạo server, database và Entra admin, nhưng **không** tạo được role trong PostgreSQL cho managed identity (cần chạy SQL bằng
-token của Entra admin). Làm một lần cho mỗi môi trường, từ máy trong VNet (hoặc jump host), bằng tài khoản là `entra_admin`:
+Terraform creates the server, the database and the Entra admin, but it **cannot** create the PostgreSQL role for the managed identity (that needs SQL run with
+the Entra admin's token). Do it once per environment, from a machine inside the VNet (or a jump host), with the account that is `entra_admin`:
 
 ```bash
-ENV=uat   # hoặc prod
+ENV=uat   # or prod
 cd envs/$ENV
 PGHOST=$(terraform output -raw postgres_fqdn)
 APP=$(terraform output -json workload_identity_names | jq -r .scheduling)
 export PGPASSWORD=$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)
 ADMIN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 
-# Tạo role cho managed identity (tên role = tên identity)
+# Create the role for the managed identity (role name = identity name)
 psql "host=$PGHOST dbname=postgres user=$ADMIN sslmode=require" \
   -c "select * from pgaadauth_create_principal('$APP', false, false);"
 
-# Quyền trên database scheduling. Flyway chạy trong service nên role cần tạo bảng trong schema public (02-db-scheduling §5).
+# Permissions on the scheduling database. Flyway runs inside the service, so the role must create tables in schema public (02-db-scheduling §5).
 psql "host=$PGHOST dbname=scheduling user=$ADMIN sslmode=require" <<SQL
 GRANT CONNECT, TEMPORARY ON DATABASE scheduling TO "$APP";
 GRANT USAGE, CREATE ON SCHEMA public TO "$APP";
 SQL
 ```
 
-Kiểm tra: pod scheduling khởi động, Flyway in `Successfully applied`, `/health/ready` trả 200.
+Check: the scheduling pod starts, Flyway prints `Successfully applied`, `/health/ready` returns 200.
 
-Bảo mật:
-- Token của admin chỉ sống khoảng 1 giờ, chỉ để trong biến môi trường của phiên shell; không ghi vào file hay lịch sử lệnh.
-- Không bật lại password auth để "cho nhanh"; không tạo user có mật khẩu.
-- Khi tách migration ra Job riêng (`scheduling_migrator`), thu hồi quyền `CREATE` trên schema của role service.
+Security:
+- The admin token lives about 1 hour and stays only in an environment variable of the shell session; never write it to a file or the command history.
+- Do not turn password auth back on "to be quick"; do not create a user with a password.
+- When migration moves to its own Job (`scheduling_migrator`), revoke `CREATE` on the schema from the service role.

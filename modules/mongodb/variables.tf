@@ -6,7 +6,7 @@ variable "private_endpoints_subnet_id" { type = string }
 variable "private_dns_zone_id" { type = string }
 
 variable "compute_tier" {
-  description = "M10 cho môi trường thử; M30 trở lên cho prod/đo hiệu năng."
+  description = "M10 for test environments; M30 or larger for prod and performance measurement."
   type        = string
   default     = "M10"
 }
@@ -22,15 +22,15 @@ variable "mongo_version" {
 }
 
 variable "high_availability_mode" {
-  description = "Disabled cho môi trường thử; ZoneRedundantPreferred cho prod."
+  description = "Disabled for test environments; ZoneRedundantPreferred for prod."
   type        = string
   default     = "Disabled"
 }
 
 variable "service_users" {
   description = <<-EOT
-    Mỗi service một danh tính Entra (workload identity) và chỉ được ghi vào database của chính nó (ADR-0014).
-    Khóa = tên service, object_id = principal của managed identity, databases = database được cấp readWrite.
+    One Entra identity (workload identity) per service, allowed to write only to its own database (ADR-0014).
+    Key = service name, object_id = principal of the managed identity, databases = databases granted readWrite.
   EOT
   type = map(object({
     object_id = string

@@ -16,7 +16,7 @@ resource "azurerm_application_insights" "this" {
   tags                = var.tags
 }
 
-# Managed Prometheus (nhận metric từ AKS; dashboard dùng Managed Grafana khi cần)
+# Managed Prometheus (receives metrics from AKS; dashboards use Managed Grafana when needed)
 resource "azurerm_monitor_workspace" "prometheus" {
   name                = "amw-${var.name_prefix}"
   resource_group_name = var.resource_group_name

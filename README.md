@@ -1,77 +1,77 @@
 # shp-infra
 
-Hạ tầng Azure bằng Terraform cho Smart Hospital Platform. Quyết định: ADR-0004, ADR-0009, **ADR-0011** (repo ứng dụng).
+Azure infrastructure in Terraform for the Smart Hospital Platform. Decisions: ADR-0004, ADR-0009, **ADR-0011** (application repo).
 
-**Chỉ có 2 môi trường cloud, cả hai ephemeral**: `uat` (thử tích hợp, đo hiệu năng) và `prod` (chỉ dựng khi demo). Dev chạy trên máy cá nhân, không cần repo này.
+**There are only 2 cloud environments, both ephemeral**: `uat` (integration testing, performance measurement) and `prod` (provisioned only for the demo). Dev runs on personal machines and does not need this repo.
 
 ```
-bootstrap/        tài nguyên thường trực: state, ACR, identity GitHub OIDC, ngân sách   (chạy tay MỘT lần)
-modules/          network · monitoring · keyvault · aks · environment (ghép các module dưới đây)
-                  dữ liệu: postgres · mongodb · redis · servicebus · storage · search · private-endpoint
-                  danh tính và giám sát: workload-identity · observability (Managed Prometheus + Grafana)
-envs/uat, prod    hai stack; khác nhau về kích cỡ (sizing) và mức bảo vệ (purge protection, SKU AKS)
+bootstrap/        always-on resources: state, ACR, GitHub OIDC identities, budget   (run by hand ONCE)
+modules/          network · monitoring · keyvault · aks · environment (composes the modules below)
+                  data: postgres · mongodb · redis · servicebus · storage · search · private-endpoint
+                  identity and monitoring: workload-identity · observability (Managed Prometheus + Grafana)
+envs/uat, prod    two stacks; they differ in sizing and protection level (purge protection, AKS SKU)
 .github/workflows ci · env-provision · env-destroy · cost-guard
 ```
 
-## Quy trình
-1. **Một lần** (SA, bằng tay): chạy `bootstrap/` (xem `bootstrap/README.md`), cấu hình GitHub variables và Environments.
-2. **Dựng môi trường:** Actions → `env-provision` → chọn `uat`/`prod` → plan → apply → cài Argo CD và áp dụng `shp-gitops/bootstrap/root-<env>.yaml` (ENV-01). Từ đây Argo CD tự dựng mọi thứ trong cụm từ `shp-gitops`.
-3. **Hủy môi trường:** Actions → `env-destroy` → gõ `destroy-<env>`.
+## Process
+1. **Once** (SA, by hand): run `bootstrap/` (see `bootstrap/README.md`), configure the GitHub variables and Environments.
+2. **Provision an environment:** Actions → `env-provision` → choose `uat`/`prod` → plan → apply → install Argo CD and apply `shp-gitops/bootstrap/root-<env>.yaml` (ENV-01). From here Argo CD builds everything inside the cluster from `shp-gitops`.
+3. **Destroy an environment:** Actions → `env-destroy` → type `destroy-<env>`.
 
-**Ai được chạy:** chỉ chủ repo. Gói GitHub hiện tại không cho đặt người duyệt Environment ở repo private, nên mỗi workflow tự kiểm tra `github.triggering_actor` và dừng ngay nếu không phải chủ repo. Muốn xem kế hoạch trước khi apply: chạy `ci` trên PR, hoặc đọc phần Summary của job `plan`.
-4. Mọi thay đổi code hạ tầng đi qua PR; `ci` chỉ kiểm tĩnh (fmt, validate, tflint, Trivy), **không apply**.
+**Who may run them:** only the repo owner. The current GitHub plan does not allow Environment reviewers on a private repo, so each workflow checks `github.triggering_actor` itself and stops at once if it is not the repo owner. To see the plan before apply: run `ci` on a PR, or read the Summary of the `plan` job.
+4. Every infrastructure code change goes through a PR; `ci` only runs static checks (fmt, validate, tflint, Trivy) and **never applies**.
 
-## Bảo mật (mặc định)
-- Không có secret trong repo: Azure OIDC federated credential, quyền tối thiểu theo từng identity; state trong Storage Account tắt shared key, bật versioning.
-- AKS: Entra ID RBAC (tắt tài khoản cục bộ), Workload Identity, Azure CNI Overlay + Cilium, Key Vault CSI, trải 3 availability zone, **API server chỉ cho dải IP khai báo** (`authorized_ip_ranges`, bắt buộc, cấm `0.0.0.0/0`).
-- Key Vault: RBAC, không public, private endpoint; prod bật purge protection. Tên có hậu tố ngẫu nhiên để dựng lại được.
-- Bootstrap bằng `az aks command invoke` (không mở API server cho runner).
+## Security (defaults)
+- No secrets in the repo: Azure OIDC federated credentials, least privilege per identity; state in a Storage Account with shared keys off and versioning on.
+- AKS: Entra ID RBAC (local accounts off), Workload Identity, Azure CNI Overlay + Cilium, Key Vault CSI, spread over 3 availability zones, **API server reachable only from the declared IP ranges** (`authorized_ip_ranges`, required, `0.0.0.0/0` forbidden).
+- Key Vault: RBAC, not public, private endpoint; purge protection on in prod. The name has a random suffix so the environment can be rebuilt.
+- Bootstrap through `az aks command invoke` (the API server is not opened to the runner).
 
-## Dịch vụ dữ liệu, hàng đợi và giám sát
+## Data services, messaging and monitoring
 
-Thiết kế gốc: ADR-0008, ADR-0014 và `detailed-design/05, 06, 13` (repo ứng dụng). Module `environment` dựng tất cả cùng cụm AKS.
+Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application repo). The `environment` module provisions all of them together with the AKS cluster.
 
-| Module | Dịch vụ Azure | Ai dùng | Bảo mật |
+| Module | Azure service | Used by | Security |
 |---|---|---|---|
-| `postgres` | PostgreSQL Flexible Server, database `scheduling` | scheduling | Trong VNet, không địa chỉ công khai, chỉ đăng nhập Entra ID (tắt mật khẩu), mở rộng `btree_gist` |
-| `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, tắt truy cập công khai, mỗi service một người dùng Entra chỉ `readWrite` trên database của mình |
-| `redis` | Azure Managed Redis | gateway (giới hạn tốc độ), scheduling (cache slot) | Private endpoint, tắt khóa truy cập, chỉ Entra ID |
-| `servicebus` | Service Bus, topic `shp-events`, 7 subscription có bộ lọc, DLQ sau 5 lần giao | tất cả (phát), consumer (nhận) | Tắt SAS key, Entra ID, TLS 1.2; Premium có private endpoint |
-| `storage` | Hai storage account: tài liệu (`documents`, `quarantine`, `kb`, `mlops`) và audit WORM | document, ai, ml, audit | Tắt shared key, private endpoint, versioning và xóa mềm 14 ngày; audit bất biến (prod 10 năm, khóa) |
-| `search` | Azure AI Search | ai | Tắt khóa API, private endpoint |
-| `workload-identity` | Mỗi service một managed identity + federated credential | tất cả | Pod đăng nhập bằng token ServiceAccount, không có mật khẩu |
-| `observability` | Managed Prometheus (thu metric AKS, 4 cảnh báo hạ tầng) và Managed Grafana | SA, DevOps | Grafana chỉ đăng nhập Entra ID, không phát API key |
+| `postgres` | PostgreSQL Flexible Server, database `scheduling` | scheduling | Inside the VNet, no public address, Entra ID sign-in only (passwords off), `btree_gist` extension |
+| `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, public access off, one Entra user per service with `readWrite` on its own database only |
+| `redis` | Azure Managed Redis | gateway (rate limiting), scheduling (slot cache) | Private endpoint, access keys off, Entra ID only |
+| `servicebus` | Service Bus, topic `shp-events`, 7 filtered subscriptions, DLQ after 5 deliveries | everyone (publish), consumers (receive) | SAS keys off, Entra ID, TLS 1.2; Premium has a private endpoint |
+| `storage` | Two storage accounts: documents (`documents`, `quarantine`, `kb`, `mlops`) and WORM audit | document, ai, ml, audit | Shared keys off, private endpoint, versioning and 14-day soft delete; immutable audit (prod 10 years, locked) |
+| `search` | Azure AI Search | ai | API keys off, private endpoint |
+| `workload-identity` | One managed identity + federated credential per service | everyone | Pods sign in with the ServiceAccount token, no passwords |
+| `observability` | Managed Prometheus (AKS metrics, 4 infrastructure alerts) and Managed Grafana | SA, DevOps | Grafana allows Entra ID sign-in only and issues no API keys |
 
-**Sau khi dựng (việc thủ công còn lại, vì là mặt phẳng dữ liệu nên Terraform không làm được):**
-1. PostgreSQL: dùng `workload_identity_client_ids` (output của stack) để tạo vai trò Entra cho `scheduling` trong database (`pgaadauth_create_principal`), rồi cấp quyền tối thiểu. Job migration của scheduling làm bước này.
-2. Điền `workloadIdentity.clientId` và `serviceAccount.name: <service>` vào values từng service trong `shp-gitops` (tên ServiceAccount trùng tên service, namespace `shp-apps`).
-3. Service Bus: định dạng thuộc tính `type` dùng trong bộ lọc phải khớp cách thư viện phát event ghi CloudEvents (xem `13-events.md`); kiểm bằng một event thử trước khi bật consumer.
-4. Mongo: tài khoản quản trị gốc (`shpadmin`) chỉ nằm trong state, không service nào dùng. Sau khi dựng, tắt `NativeAuth` ở prod khi đã xác nhận đăng nhập Entra chạy được.
+**After provisioning (remaining manual work — it is data plane, so Terraform cannot do it):**
+1. PostgreSQL: use `workload_identity_client_ids` (stack output) to create the Entra role for `scheduling` in the database (`pgaadauth_create_principal`), then grant least privilege. The scheduling migration job does this step.
+2. Fill `workloadIdentity.clientId` and `serviceAccount.name: <service>` into each service's values in `shp-gitops` (the ServiceAccount name equals the service name, namespace `shp-apps`).
+3. Service Bus: the format of the `type` property used in the filters must match how the event library writes CloudEvents (see `13-events.md`); check with a test event before enabling consumers.
+4. Mongo: the root administrator account (`shpadmin`) exists only in the state and no service uses it. After provisioning, turn off `NativeAuth` in prod once Entra sign-in is confirmed to work.
 
-**Chi phí khi dựng môi trường (theo giờ, ước lượng, tính bằng đơn giá công khai):** Service Bus Premium là khoản lớn nhất (khoảng 0,9 USD/giờ), tiếp theo Cosmos DB MongoDB vCore M10 và AI Search Basic. Môi trường thử sống tối đa 8 giờ (cost-guard) nên phần này đáng kể nhưng có giới hạn. Muốn rẻ hơn khi chưa cần private endpoint cho hàng đợi: đặt `messaging_sku = "Standard"` (namespace mở cổng công khai, chỉ Entra ID, event mang mã bệnh nhân nên **không dùng cho dữ liệu thật**).
+**Cost while an environment is up (per hour, estimated from public list prices):** Service Bus Premium is the largest item (about 0.9 USD/hour), followed by Cosmos DB MongoDB vCore M10 and AI Search Basic. A test environment lives at most 8 hours (cost-guard), so this is significant but bounded. To make it cheaper while the queue does not need a private endpoint yet: set `messaging_sku = "Standard"` (the namespace opens a public endpoint, Entra ID only; events carry patient ids, so **do not use it for real data**).
 
-## GitHub variables cần có (không phải secret)
-`AZURE_TENANT_ID` · `AZURE_SUBSCRIPTION_ID` · `TFSTATE_STORAGE_ACCOUNT` · `ACR_NAME` · `ADMIN_IP_RANGES` (JSON, ví dụ `["203.0.113.5/32"]`) ·
+## GitHub variables required (not secrets)
+`AZURE_TENANT_ID` · `AZURE_SUBSCRIPTION_ID` · `TFSTATE_STORAGE_ACCOUNT` · `ACR_NAME` · `ADMIN_IP_RANGES` (JSON, for example `["203.0.113.5/32"]`) ·
 `AZURE_CLIENT_ID_CI_PLAN` · `AZURE_CLIENT_ID_INFRA_UAT` · `AZURE_CLIENT_ID_INFRA_UAT_DESTROY` · `AZURE_CLIENT_ID_INFRA_PROD` · `AZURE_CLIENT_ID_INFRA_PROD_DESTROY`
-(các giá trị client id lấy từ output `github_identity_client_ids` của bootstrap).
+(the client id values come from the bootstrap output `github_identity_client_ids`).
 
-`AZURE_CLIENT_ID_CHART_PUSH` (identity đẩy Helm chart) đặt ở repo **shp-platform-templates**; `AZURE_CLIENT_ID_ACR_PUSH` đặt ở repo ứng dụng.
+`AZURE_CLIENT_ID_CHART_PUSH` (the identity that pushes the Helm chart) is set in the **shp-platform-templates** repo; `AZURE_CLIENT_ID_ACR_PUSH` is set in the application repo.
 
-**Azure chỉ tin nhánh `main`:**
-- Identity theo `ref` (`ci-plan`: repo này; `acr-push`: repo ứng dụng) chỉ nhận token từ `refs/heads/main`. Nhánh khác, PR hay fork có subject khác nên Azure từ chối.
-- Identity theo Environment (`infra-<env>`, `infra-<env>-destroy`, `release-chart`) dựa vào *deployment branch policy*: Environment chỉ cho nhánh `main` (riêng `release-chart` chỉ cho tag `chart-v*`). Job trên nhánh khác bị GitHub từ chối trước khi xin được token. Đã kiểm chứng trên gói hiện tại bằng một nhánh thử.
-- Không dùng cho CI trên pull request: PR chỉ kiểm tĩnh, không đăng nhập Azure.
+**Azure trusts the `main` branch only:**
+- Identities bound to a `ref` (`ci-plan`: this repo; `acr-push`: the application repo) only get a token from `refs/heads/main`. Another branch, a PR or a fork has a different subject, so Azure refuses it.
+- Identities bound to an Environment (`infra-<env>`, `infra-<env>-destroy`, `release-chart`) rely on the *deployment branch policy*: the Environment only allows the `main` branch (`release-chart` only allows `chart-v*` tags). A job on another branch is rejected by GitHub before it can request a token. Verified on the current plan with a test branch.
+- Not used by CI on pull requests: a PR only runs static checks and never signs in to Azure.
 
-Cho bước ENV-01 (Argo CD đọc repo private): một GitHub App **chỉ đọc** (`Contents: Read`, `Metadata: Read`) cài trên `shp-gitops` và `shp-platform-templates`.
-Variable `ARGOCD_REPO_APP_ID`, `ARGOCD_REPO_APP_INSTALLATION_ID`; secret `ARGOCD_REPO_APP_PRIVATE_KEY`.
-Identity `AZURE_CLIENT_ID_INFRA_<ENV>` cần thêm quyền chạy `az aks command invoke` và quản trị cụm (ví dụ vai trò *Azure Kubernetes Service RBAC Cluster Admin* trên cụm của môi trường đó).
+For the ENV-01 step (Argo CD reading private repos): a **read-only** GitHub App (`Contents: Read`, `Metadata: Read`) installed on `shp-gitops` and `shp-platform-templates`.
+Variables `ARGOCD_REPO_APP_ID`, `ARGOCD_REPO_APP_INSTALLATION_ID`; secret `ARGOCD_REPO_APP_PRIVATE_KEY`.
+The identity `AZURE_CLIENT_ID_INFRA_<ENV>` additionally needs permission to run `az aks command invoke` and administer the cluster (for example the *Azure Kubernetes Service RBAC Cluster Admin* role on that environment's cluster).
 
-## Đã có / còn thiếu
-| Đã có (đã `fmt` + `validate` + tflint + Trivy sạch) | Còn lại (backlog) |
+## Done / still missing
+| Done (`fmt` + `validate` + tflint + Trivy clean) | Remaining (backlog) |
 |---|---|
-| bootstrap, network, monitoring, Key Vault, AKS (3 node pool), 2 stack, 4 workflow | IAC-09..14 module dữ liệu (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search), IAC-15 workload identity theo service, IAC-16 Entra app, IAC-18/19 Defender + Azure OpenAI |
-| | OBS-01: nối Managed Prometheus (cần data collection rule), Grafana |
-| ENV-01: `env-provision` cài Argo CD và giao cụm cho GitOps (chưa chạy thử trên Azure thật) | ENV-01 phần còn lại: nạp dữ liệu tổng hợp, smoke test sau khi dựng |
+| bootstrap, network, monitoring, Key Vault, AKS (3 node pools), 2 stacks, 4 workflows | IAC-09..14 data modules (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search), IAC-15 workload identity per service, IAC-16 Entra app, IAC-18/19 Defender + Azure OpenAI |
+| | OBS-01: connect Managed Prometheus (needs a data collection rule), Grafana |
+| ENV-01: `env-provision` installs Argo CD and hands the cluster to GitOps (not yet tried on real Azure) | Rest of ENV-01: load synthetic data, smoke test after provisioning |
 
-> **Chưa `apply` lên Azure** (theo quy tắc dự án) và chưa chạy workflow trên GitHub thật. Plugin `azurerm` của tflint chưa chạy được ở nơi viết code; CI sẽ chạy.
-> Chi phí: AKS tính tiền theo giờ khi môi trường tồn tại; `cost-guard` cảnh báo môi trường quá TTL. Ước tính chi tiết: task PRD-05.
+> **Not yet `apply`-ed to Azure** (per the project rule) and the workflows have not run on real GitHub. The tflint `azurerm` plugin could not run where the code was written; CI runs it.
+> Cost: AKS is billed per hour while the environment exists; `cost-guard` warns about environments past their TTL. Detailed estimate: task PRD-05.

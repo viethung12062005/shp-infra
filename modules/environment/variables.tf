@@ -2,7 +2,7 @@ variable "environment" {
   type = string
   validation {
     condition     = contains(["uat", "prod"], var.environment)
-    error_message = "environment phải là uat hoặc prod."
+    error_message = "environment must be uat or prod."
   }
 }
 
@@ -11,24 +11,24 @@ variable "tenant_id" { type = string }
 variable "acr_id" { type = string }
 
 variable "sizing" {
-  description = "small: thử tích hợp (rẻ). prod: cỡ production, dùng khi đo hiệu năng/demo."
+  description = "small: integration testing (cheap). prod: production size, used for performance measurement and demos."
   type        = string
   default     = "small"
   validation {
     condition     = contains(["small", "prod"], var.sizing)
-    error_message = "sizing phải là small hoặc prod."
+    error_message = "sizing must be small or prod."
   }
 }
 
 variable "address_space" { type = string }
 
 variable "created_at" {
-  description = "Ngày dựng (YYYY-MM-DD), do workflow truyền vào để plan không đổi mỗi lần chạy."
+  description = "Provisioning date (YYYY-MM-DD), passed in by the workflow so the plan does not change on every run."
   type        = string
 }
 
 variable "ttl_hours" {
-  description = "Môi trường nên được hủy sau số giờ này (cost-guard cảnh báo khi quá hạn)."
+  description = "The environment should be destroyed after this many hours (cost-guard warns when it is overdue)."
   type        = number
   default     = 8
 }
@@ -48,7 +48,7 @@ variable "kubernetes_version" {
 }
 
 variable "entra_admin" {
-  description = "Quản trị viên Entra ID của PostgreSQL (danh tính chạy Terraform và migration). Máy chủ không có mật khẩu."
+  description = "Entra ID administrator of PostgreSQL (the identity that runs Terraform and migrations). The server has no password."
   type = object({
     object_id = string
     name      = string
@@ -57,19 +57,19 @@ variable "entra_admin" {
 }
 
 variable "messaging_sku" {
-  description = "Premium (private endpoint, ~0,9 USD/giờ/đơn vị, môi trường thử chỉ sống vài giờ) hoặc Standard (rẻ, cổng công khai chỉ Entra ID)."
+  description = "Premium (private endpoint, ~0.9 USD/hour/unit; a test environment only lives a few hours) or Standard (cheap, public endpoint with Entra ID only)."
   type        = string
   default     = "Premium"
 }
 
 variable "grafana_admin_principal_ids" {
-  description = "Người/nhóm Entra quản trị Grafana."
+  description = "Entra users/groups that administer Grafana."
   type        = map(string)
   default     = {}
 }
 
 variable "grafana_viewer_principal_ids" {
-  description = "Người/nhóm Entra chỉ xem dashboard Grafana."
+  description = "Entra users/groups that can only view the Grafana dashboards."
   type        = map(string)
   default     = {}
 }
