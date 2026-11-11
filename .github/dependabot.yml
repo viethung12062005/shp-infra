@@ -1,0 +1,15 @@
+# Weekly dependency updates; PRs are reviewed by the SA (GOV-06).
+version: 2
+updates:
+  - package-ecosystem: terraform
+    directories: ["/bootstrap", "/envs/uat", "/envs/prod", "/modules/*"]
+    schedule: { interval: weekly }
+    groups:
+      # One PR for all provider bumps so the stacks and modules move together.
+      providers: { patterns: ["*"] }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      # One PR for all action bumps instead of one per action.
+      actions: { patterns: ["*"] }
