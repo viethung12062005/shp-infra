@@ -1,5 +1,5 @@
-# Azure AI Search cho kho tri thức RAG của ai service (06-data-ai.md, index kb-chunks-v1). Chỉ Entra ID (tắt khóa API),
-# chỉ truy cập qua private endpoint (cần SKU Basic trở lên).
+# Azure AI Search for the RAG knowledge base of the ai service (06-data-ai.md, index kb-chunks-v1). Entra ID only (API keys off),
+# reachable only through the private endpoint (needs SKU Basic or higher).
 resource "random_string" "suffix" {
   length  = 4
   upper   = false
@@ -32,7 +32,7 @@ module "private_endpoint" {
   private_dns_zone_id = var.private_dns_zone_id
 }
 
-# ai service đọc/ghi tài liệu trong index; tạo/sửa index (lược đồ) thuộc job triển khai nên cần quyền quản lý dịch vụ.
+# The ai service reads/writes documents in the index; creating/changing the index (schema) belongs to the deployment job, which needs the service management role.
 resource "azurerm_role_assignment" "index_data" {
   for_each = var.create_role_assignments ? var.index_contributor_principal_ids : {}
 

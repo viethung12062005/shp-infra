@@ -19,7 +19,7 @@ module "environment" {
   enable_ai_pool       = var.enable_ai_pool
   authorized_ip_ranges = var.authorized_ip_ranges
 
-  # Danh tính chạy Terraform là quản trị viên Entra của PostgreSQL (máy chủ không có mật khẩu)
+  # The identity that runs Terraform is the Entra administrator of PostgreSQL (the server has no password)
   entra_admin = {
     object_id = data.azurerm_client_config.current.object_id
     name      = "id-shp-infra-prod"

@@ -5,7 +5,7 @@ variable "tags" { type = map(string) }
 variable "tenant_id" { type = string }
 
 variable "purge_protection_enabled" {
-  description = "Bật ở prod. Tắt ở UAT để dựng lại/hủy môi trường được."
+  description = "On in prod. Off in UAT so the environment can be rebuilt and destroyed."
   type        = bool
   default     = false
 }

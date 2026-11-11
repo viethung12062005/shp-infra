@@ -6,7 +6,7 @@ variable "private_endpoints_subnet_id" { type = string }
 variable "private_dns_zone_id" { type = string }
 
 variable "sku" {
-  description = "basic cho môi trường thử; standard khi cần nhiều replica/phân vùng."
+  description = "basic for test environments; standard when more replicas/partitions are needed."
   type        = string
   default     = "basic"
 }
@@ -17,19 +17,19 @@ variable "replica_count" {
 }
 
 variable "semantic_search_sku" {
-  description = "null = tắt xếp hạng ngữ nghĩa (không tốn phí); free hoặc standard để bật."
+  description = "null = semantic ranking off (no charge); free or standard to turn it on."
   type        = string
   default     = null
 }
 
 variable "index_contributor_principal_ids" {
-  description = "Đọc/ghi dữ liệu trong index (ai service)."
+  description = "Read/write data in the index (ai service)."
   type        = map(string)
   default     = {}
 }
 
 variable "service_contributor_principal_ids" {
-  description = "Tạo/sửa index (job triển khai). Không cấp cho service chạy thường xuyên."
+  description = "Create/change the index (deployment job). Never granted to a long-running service."
   type        = map(string)
   default     = {}
 }

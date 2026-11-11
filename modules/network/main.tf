@@ -7,7 +7,7 @@ resource "azurerm_virtual_network" "this" {
 }
 
 locals {
-  # /16 chia thành: nodes AKS (/20), private endpoint (/24), PostgreSQL delegated (/24)
+  # The /16 is split into: AKS nodes (/20), private endpoints (/24), delegated PostgreSQL (/24)
   subnets = {
     aks               = cidrsubnet(var.address_space, 4, 0)
     private-endpoints = cidrsubnet(var.address_space, 8, 16)

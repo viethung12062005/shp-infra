@@ -4,18 +4,18 @@ variable "location" { type = string }
 variable "tags" { type = map(string) }
 
 variable "kubernetes_version" {
-  description = "Để null để dùng bản mặc định được hỗ trợ của Azure; ghim khi cần."
+  description = "Leave null to use the Azure-supported default version; pin when needed."
   type        = string
   default     = null
 }
 
 variable "sku_tier" {
-  description = "Free (UAT) hoặc Standard (prod, có SLA)."
+  description = "Free (UAT) or Standard (prod, with an SLA)."
   type        = string
   default     = "Free"
   validation {
     condition     = contains(["Free", "Standard"], var.sku_tier)
-    error_message = "sku_tier phải là Free hoặc Standard."
+    error_message = "sku_tier must be Free or Standard."
   }
 }
 
@@ -28,11 +28,11 @@ variable "subnet_id" { type = string }
 variable "log_analytics_workspace_id" { type = string }
 
 variable "authorized_ip_ranges" {
-  description = "Dải IP (CIDR) được gọi API server của AKS. Bắt buộc, không được rỗng hoặc 0.0.0.0/0."
+  description = "IP ranges (CIDR) allowed to call the AKS API server. Required; must not be empty or 0.0.0.0/0."
   type        = list(string)
   validation {
     condition     = length(var.authorized_ip_ranges) > 0 && !contains(var.authorized_ip_ranges, "0.0.0.0/0")
-    error_message = "authorized_ip_ranges phải có ít nhất một dải CIDR và không được là 0.0.0.0/0."
+    error_message = "authorized_ip_ranges must contain at least one CIDR range and must not be 0.0.0.0/0."
   }
 }
 
@@ -54,7 +54,7 @@ variable "apps_pool" {
 }
 
 variable "enable_ai_pool" {
-  description = "Node pool riêng cho ai-service/ollama (có taint)."
+  description = "Dedicated node pool for ai-service/ollama (tainted)."
   type        = bool
   default     = false
 }

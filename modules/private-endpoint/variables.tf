@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Tên private endpoint (pe-...)."
+  description = "Name of the private endpoint (pe-...)."
   type        = string
 }
 variable "resource_group_name" { type = string }
@@ -9,7 +9,7 @@ variable "subnet_id" { type = string }
 variable "target_resource_id" { type = string }
 
 variable "subresource" {
-  description = "Loại kết nối của dịch vụ đích: vault, MongoCluster, redisEnterprise, namespace, blob, searchService..."
+  description = "Connection type of the target service: vault, MongoCluster, redisEnterprise, namespace, blob, searchService..."
   type        = string
 }
 

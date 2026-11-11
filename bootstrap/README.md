@@ -1,15 +1,15 @@
 # bootstrap
 
-Tạo tài nguyên thường trực. **SA chạy bằng tay một lần** (tài khoản có quyền Owner trên subscription), sau đó hầu như không đổi.
+Creates the always-on resources. **The SA runs it by hand once** (an account with Owner on the subscription); after that it hardly changes.
 
 ```bash
 az login
 cd bootstrap
-cat > bootstrap.tfvars <<'T'        # file *.tfvars đã được gitignore
+cat > bootstrap.tfvars <<'T'        # *.tfvars files are gitignored
 subscription_id     = "<subscription id>"
-github_owner        = "<tài khoản GitHub>"
-budget_alert_emails = ["<email của bạn>"]
-monthly_budget_usd  = <số tiền do PM chốt>
+github_owner        = "<GitHub account>"
+budget_alert_emails = ["<your email>"]
+monthly_budget_usd  = <amount set by the PM>
 budget_start_date   = "2026-11-01T00:00:00Z"
 T
 terraform init
@@ -17,43 +17,43 @@ terraform plan  -var-file=bootstrap.tfvars -out=tfplan
 terraform apply tfplan
 ```
 
-Sau khi apply:
-1. Đặt các output vào GitHub variables (xem `../README.md`): `tfstate_storage_account`, `acr_name`, `github_identity_client_ids`.
-2. Chuyển state của chính bootstrap vào storage account vừa tạo (tuỳ chọn): thêm khối `backend "azurerm" {}` rồi `terraform init -migrate-state`.
-3. Cấu hình GitHub Environments theo runbook `docs/04-devops/github-setup.md` (repo ứng dụng): `infra-uat`, `infra-uat-destroy`, `infra-prod`, `infra-prod-destroy`.
+After apply:
+1. Put the outputs into GitHub variables (see `../README.md`): `tfstate_storage_account`, `acr_name`, `github_identity_client_ids`.
+2. Move the bootstrap's own state into the storage account just created (optional): add a `backend "azurerm" {}` block, then `terraform init -migrate-state`.
+3. Configure the GitHub Environments per the runbook `docs/04-devops/github-setup.md` (application repo): `infra-uat`, `infra-uat-destroy`, `infra-prod`, `infra-prod-destroy`.
 
-Lưu ý: identity dựng môi trường có `Contributor` + `Role Based Access Control Administrator` ở phạm vi subscription (cần để tạo tài nguyên và gán quyền).
-Khi tách prod sang subscription riêng (NFR-D4), thu hẹp phạm vi này.
+Note: the identities that provision environments have `Contributor` + `Role Based Access Control Administrator` at subscription scope (needed to create resources and assign roles).
+When prod moves to its own subscription (NFR-D4), narrow this scope.
 
-## Môi trường bị chặn `Microsoft.Authorization/*/Write` (sandbox)
+## Environments that block `Microsoft.Authorization/*/Write` (sandbox)
 
-Một số subscription (ví dụ sandbox `FSO-SandboxOps`) cho phép tạo tài nguyên nhưng **cấm mọi thao tác ghi phân quyền**
-và **không cấp `dataActions`**. Kiểm tra bằng:
+Some subscriptions (for example the `FSO-SandboxOps` sandbox) allow creating resources but **forbid every role-assignment write**
+and **grant no `dataActions`**. Check with:
 
 ```bash
-az role definition list --name <role> -o json                     # xem notActions / dataActions
+az role definition list --name <role> -o json                     # look at notActions / dataActions
 az rest --url "https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
 ```
 
-Ở môi trường đó, đặt trong `bootstrap.tfvars`:
+In such an environment, set in `bootstrap.tfvars`:
 
 ```hcl
-create_role_assignments = false   # không tạo role assignment
-manage_state_container  = false   # không tạo container qua Entra (thiếu dataActions)
-acr_sku                 = "Basic" # tuỳ ngân sách
+create_role_assignments = false   # do not create role assignments
+manage_state_container  = false   # do not create the container through Entra (no dataActions)
+acr_sku                 = "Basic" # depending on the budget
 ```
 
-`terraform apply` khi đó tạo 19 tài nguyên: resource group, storage account (versioning, soft delete 30 ngày, tắt shared
-key), ACR (tắt admin), 6 managed identity + federated credential cho GitHub OIDC, và ngân sách tháng.
+`terraform apply` then creates 19 resources: the resource group, the storage account (versioning, 30-day soft delete, shared
+keys off), ACR (admin off), 6 managed identities + federated credentials for GitHub OIDC, and the monthly budget.
 
-Hai việc còn lại cần tài khoản **Owner** trên subscription (một lần):
+Two things remain that need an **Owner** account on the subscription (once):
 
 ```bash
-# 1) Phân quyền: lấy đúng lệnh từ output
+# 1) Role assignments: take the exact commands from the output
 terraform output -json required_role_assignments
 
-# 2) Container chứa state: dùng tài khoản có "Storage Blob Data Contributor" trên storage account
+# 2) State container: use an account with "Storage Blob Data Contributor" on the storage account
 az storage container create --account-name <tfstate_storage_account> --name tfstate --auth-mode login
 ```
 
-Sau đó đặt GitHub variables theo `../README.md`; identity GitHub chỉ dùng được sau bước 1.
+Then set the GitHub variables per `../README.md`; the GitHub identities only work after step 1.

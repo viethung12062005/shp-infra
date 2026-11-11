@@ -1,4 +1,4 @@
-# PostgreSQL Flexible Server cho scheduling (ADR-0014). Chỉ truy cập trong VNet, chỉ đăng nhập bằng Entra ID.
+# PostgreSQL Flexible Server for scheduling (ADR-0014). Reachable only inside the VNet, sign-in with Entra ID only.
 resource "random_string" "suffix" {
   length  = 4
   upper   = false
@@ -58,14 +58,14 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
   charset   = "UTF8"
 }
 
-# scheduling dùng btree_gist để loại trừ chồng lịch bác sĩ ở tầng CSDL (02-db-scheduling.md).
+# scheduling uses btree_gist to exclude overlapping doctor schedules at the database level (02-db-scheduling.md).
 resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.this.id
   value     = "BTREE_GIST"
 }
 
-# Ghi nhật ký kết nối/truy vấn để dò truy cập bất thường (NFR-SEC audit); không ghi giá trị tham số.
+# Log connections/queries to trace unusual access (NFR-SEC audit); parameter values are not logged.
 resource "azurerm_postgresql_flexible_server_configuration" "log_connections" {
   name      = "log_connections"
   server_id = azurerm_postgresql_flexible_server.this.id

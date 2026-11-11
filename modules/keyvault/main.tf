@@ -4,7 +4,7 @@ resource "random_string" "suffix" {
   special = false
 }
 
-# Tên có hậu tố ngẫu nhiên: Key Vault đã xóa mềm vẫn giữ tên, nên dựng lại môi trường sẽ không đụng tên cũ.
+# The name has a random suffix: a soft-deleted Key Vault keeps its name, so rebuilding the environment never collides with the old one.
 resource "azurerm_key_vault" "this" {
   name                          = substr("kv-${var.name_prefix}-${random_string.suffix.result}", 0, 24)
   resource_group_name           = var.resource_group_name

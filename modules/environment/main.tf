@@ -52,10 +52,10 @@ locals {
 
   data = local.sizing[var.sizing].data
 
-  # Mỗi service một danh tính; tên cũng là tên ServiceAccount (values của chart đặt serviceAccount.name = tên service).
+  # One identity per service; the name is also the ServiceAccount name (chart values set serviceAccount.name = service name).
   services = ["scheduling", "notification", "clinical", "document", "ai", "ml", "audit", "gateway"]
 
-  # Database Mongo của từng service (ADR-0014). scheduling dùng PostgreSQL, audit dùng Blob, gateway dùng Redis.
+  # Mongo database of each service (ADR-0014). scheduling uses PostgreSQL, audit uses Blob, gateway uses Redis.
   mongo_databases = {
     clinical     = ["clinical"]
     document     = ["document"]
@@ -64,7 +64,7 @@ locals {
     ml           = ["ml"]
   }
 
-  # Service có subscription trên Service Bus (khớp khóa mặc định của module servicebus)
+  # Services that have a Service Bus subscription (matches the default keys of the servicebus module)
   event_consumers = ["notification", "ml", "clinical", "scheduling", "document", "ai", "audit"]
 }
 
@@ -216,10 +216,9 @@ module "servicebus" {
   sku                         = var.messaging_sku
   log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
 
-  # Mọi service phát audit (E11) nên đều được gửi; chỉ consumer có subscription mới được nhận
-  sender_principal_ids    = module.identities.principal_ids
-  receiver_principal_ids  = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
-  create_role_assignments = var.create_role_assignments
+  # Every service emits audit (E11), so all of them may send; only consumers with a subscription may receive
+  sender_principal_ids   = module.identities.principal_ids
+  receiver_principal_ids = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
 }
 
 module "storage" {

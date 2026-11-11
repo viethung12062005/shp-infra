@@ -1,5 +1,5 @@
-# Azure Managed Redis cho giới hạn tốc độ ở gateway và cache slot trống (TTL 5 giây). Dữ liệu chỉ là bản sao, mất không sao
-# (đọc thẳng DB), nên không bật persistence. Tắt khóa truy cập: chỉ Entra ID, chỉ private endpoint.
+# Azure Managed Redis for rate limiting at the gateway and the free-slot cache (TTL 5 seconds). The data is only a copy and
+# losing it is harmless (reads fall back to the DB), so persistence is off. Access keys are off: Entra ID only, private endpoint only.
 resource "random_string" "suffix" {
   length  = 4
   upper   = false

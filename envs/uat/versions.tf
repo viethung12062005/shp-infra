@@ -5,14 +5,14 @@ terraform {
     random  = { source = "hashicorp/random", version = "~> 3.6" }
   }
 
-  # Cấu hình backend truyền lúc init (-backend-config=...), không ghi cứng vào code.
+  # The backend configuration is passed at init (-backend-config=...), never hard-coded.
   backend "azurerm" {}
 }
 
 provider "azurerm" {
   features {
     resource_group {
-      # Cho phép hủy môi trường khi còn tài nguyên do dịch vụ tự tạo (ví dụ NetworkWatcher)
+      # Allows destroying the environment while service-created resources remain (for example NetworkWatcher)
       prevent_deletion_if_contains_resources = false
     }
     key_vault {

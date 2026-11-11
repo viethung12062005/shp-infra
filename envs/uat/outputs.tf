@@ -15,17 +15,17 @@ output "key_vault_name" {
 }
 
 output "workload_identity_client_ids" {
-  description = "service -> clientId, điền vào workloadIdentity.clientId trong shp-gitops."
+  description = "service -> clientId; goes into workloadIdentity.clientId in shp-gitops."
   value       = module.environment.workload_identity_client_ids
 }
 
 output "workload_identity_names" {
-  description = "service -> tên managed identity; scheduling dùng làm SPRING_DATASOURCE_USERNAME trong shp-gitops."
+  description = "service -> managed identity name; scheduling uses it as SPRING_DATASOURCE_USERNAME in shp-gitops."
   value       = module.environment.workload_identity_names
 }
 
 output "postgres_fqdn" {
-  description = "Host PostgreSQL, dùng trong SPRING_DATASOURCE_URL của scheduling (shp-gitops)."
+  description = "PostgreSQL host, used in SPRING_DATASOURCE_URL of scheduling (shp-gitops)."
   value       = module.environment.postgres_fqdn
 }
 

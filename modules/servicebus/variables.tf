@@ -7,14 +7,14 @@ variable "private_dns_zone_id" { type = string }
 
 variable "sku" {
   description = <<-EOT
-    Premium: có private endpoint (khuyến nghị, event mang mã bệnh nhân). Standard rẻ hơn nhưng không có private endpoint:
-    khi đó namespace mở cổng công khai (chỉ Entra ID, TLS 1.2) và không tạo private endpoint.
+    Premium: has a private endpoint (recommended, events carry patient ids). Standard is cheaper but has no private endpoint:
+    the namespace then opens a public endpoint (Entra ID only, TLS 1.2) and no private endpoint is created.
   EOT
   type        = string
   default     = "Premium"
   validation {
     condition     = contains(["Premium", "Standard"], var.sku)
-    error_message = "sku phải là Premium hoặc Standard."
+    error_message = "sku must be Premium or Standard."
   }
 }
 
@@ -24,7 +24,7 @@ variable "topic_name" {
 }
 
 variable "subscriptions" {
-  description = "Mỗi consumer một subscription, lọc theo thuộc tính `type` của CloudEvents (13-events.md §2)."
+  description = "One subscription per consumer, filtered on the CloudEvents `type` attribute (13-events.md §2)."
   type        = map(list(string))
   default = {
     notification = [
@@ -47,19 +47,19 @@ variable "subscriptions" {
 }
 
 variable "sender_principal_ids" {
-  description = "Danh tính được phát event lên topic (mọi service phát audit E11, nên thường là tất cả)."
+  description = "Identities allowed to publish events to the topic (every service emits audit E11, so usually all of them)."
   type        = map(string)
 }
 
 variable "receiver_principal_ids" {
-  description = "Danh tính được nhận từ subscription cùng tên (khóa phải có trong `subscriptions`)."
+  description = "Identities allowed to receive from the subscription of the same name (the key must exist in `subscriptions`)."
   type        = map(string)
 }
 
 variable "log_analytics_workspace_id" { type = string }
 
 variable "action_group_id" {
-  description = "Nhóm cảnh báo cho DLQ có message (OBS-03). null = chưa tạo cảnh báo."
+  description = "Action group for messages in the DLQ (OBS-03). null = no alert is created."
   type        = string
   default     = null
 }

@@ -20,25 +20,25 @@ variable "grafana_major_version" {
 }
 
 variable "grafana_public_network_access" {
-  description = "Grafana chỉ cho đăng nhập Entra ID. Đặt false khi có mạng quản trị riêng (cần managed private endpoint)."
+  description = "Grafana only allows Entra ID sign-in. Set false when a dedicated admin network exists (needs a managed private endpoint)."
   type        = bool
   default     = true
 }
 
 variable "grafana_admin_principal_ids" {
-  description = "Người/nhóm Entra được quản trị Grafana (SA/DevOps)."
+  description = "Entra users/groups that administer Grafana (SA/DevOps)."
   type        = map(string)
   default     = {}
 }
 
 variable "grafana_viewer_principal_ids" {
-  description = "Người/nhóm Entra chỉ xem dashboard (dev, giảng viên)."
+  description = "Entra users/groups that can only view dashboards (devs, lecturers)."
   type        = map(string)
   default     = {}
 }
 
 variable "action_group_id" {
-  description = "Nhóm hành động nhận cảnh báo. null = chưa gắn."
+  description = "Action group that receives the alerts. null = not attached yet."
   type        = string
   default     = null
 }
