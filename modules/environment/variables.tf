@@ -73,3 +73,24 @@ variable "grafana_viewer_principal_ids" {
   type        = map(string)
   default     = {}
 }
+
+variable "create_role_assignments" {
+  description = <<-EOT
+    Tạo role assignment của các module (AKS AcrPull, Grafana đọc metric, Service Bus/Search/Storage data roles).
+    Đặt false ở subscription bị chặn Microsoft.Authorization/*/Write; phân quyền do Owner chạy sau.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "create_containers" {
+  description = "Tạo container Blob qua Entra (cần dataActions). Đặt false ở sandbox và tạo bằng az CLI."
+  type        = bool
+  default     = true
+}
+
+variable "create_entra_admin" {
+  description = "Gán quản trị viên Entra cho PostgreSQL (cần microsoft.aadiam/*/write)."
+  type        = bool
+  default     = true
+}

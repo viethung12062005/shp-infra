@@ -75,7 +75,7 @@ module "private_endpoint" {
 
 # ---- containers
 resource "azurerm_storage_container" "docs" {
-  for_each = toset(["documents", "quarantine", "kb", "mlops"])
+  for_each = var.create_containers ? toset(["documents", "quarantine", "kb", "mlops"]) : toset([])
 
   name                  = each.value
   storage_account_id    = azurerm_storage_account.this["docs"].id
@@ -85,6 +85,7 @@ resource "azurerm_storage_container" "docs" {
 }
 
 resource "azurerm_storage_container" "audit" {
+  count                 = var.create_containers ? 1 : 0
   name                  = "audit"
   storage_account_id    = azurerm_storage_account.this["audit"].id
   container_access_type = "private"
@@ -94,7 +95,8 @@ resource "azurerm_storage_container" "audit" {
 
 # WORM: bản gốc audit không ai xóa/sửa được trong thời gian khóa (kể cả Owner), vẫn nối thêm được (append blob).
 resource "azurerm_storage_container_immutability_policy" "audit" {
-  storage_container_resource_manager_id = azurerm_storage_container.audit.id
+  count                                 = var.create_containers ? 1 : 0
+  storage_container_resource_manager_id = azurerm_storage_container.audit[0].id
   immutability_period_in_days           = var.audit_retention_days
   protected_append_writes_all_enabled   = true
   locked                                = var.audit_retention_locked
@@ -130,9 +132,9 @@ resource "azurerm_security_center_storage_defender" "docs" {
 
 # ---- quyền dữ liệu theo nguyên tắc tối thiểu, gắn ở mức container
 resource "azurerm_role_assignment" "documents" {
-  for_each = {
+  for_each = var.create_containers && var.create_role_assignments ? {
     for p in setproduct(keys(var.document_writer_principal_ids), ["documents", "quarantine"]) : "${p[0]}-${p[1]}" => { who = p[0], container = p[1] }
-  }
+  } : {}
 
   scope                = azurerm_storage_container.docs[each.value.container].id
   role_definition_name = "Storage Blob Data Contributor"
@@ -140,7 +142,7 @@ resource "azurerm_role_assignment" "documents" {
 }
 
 resource "azurerm_role_assignment" "kb" {
-  for_each = var.kb_reader_principal_ids
+  for_each = var.create_containers && var.create_role_assignments ? var.kb_reader_principal_ids : {}
 
   scope                = azurerm_storage_container.docs["kb"].id
   role_definition_name = "Storage Blob Data Contributor"
@@ -148,7 +150,7 @@ resource "azurerm_role_assignment" "kb" {
 }
 
 resource "azurerm_role_assignment" "mlops" {
-  for_each = var.ml_principal_ids
+  for_each = var.create_containers && var.create_role_assignments ? var.ml_principal_ids : {}
 
   scope                = azurerm_storage_container.docs["mlops"].id
   role_definition_name = "Storage Blob Data Contributor"
@@ -156,9 +158,9 @@ resource "azurerm_role_assignment" "mlops" {
 }
 
 resource "azurerm_role_assignment" "audit" {
-  for_each = var.audit_writer_principal_ids
+  for_each = var.create_containers && var.create_role_assignments ? var.audit_writer_principal_ids : {}
 
-  scope                = azurerm_storage_container.audit.id
+  scope                = azurerm_storage_container.audit[0].id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = each.value
 }

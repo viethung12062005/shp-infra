@@ -34,7 +34,7 @@ module "private_endpoint" {
 
 # ai service đọc/ghi tài liệu trong index; tạo/sửa index (lược đồ) thuộc job triển khai nên cần quyền quản lý dịch vụ.
 resource "azurerm_role_assignment" "index_data" {
-  for_each = var.index_contributor_principal_ids
+  for_each = var.create_role_assignments ? var.index_contributor_principal_ids : {}
 
   scope                = azurerm_search_service.this.id
   role_definition_name = "Search Index Data Contributor"
@@ -42,7 +42,7 @@ resource "azurerm_role_assignment" "index_data" {
 }
 
 resource "azurerm_role_assignment" "service" {
-  for_each = var.service_contributor_principal_ids
+  for_each = var.create_role_assignments ? var.service_contributor_principal_ids : {}
 
   scope                = azurerm_search_service.this.id
   role_definition_name = "Search Service Contributor"

@@ -75,3 +75,30 @@ Identity `AZURE_CLIENT_ID_INFRA_<ENV>` cần thêm quyền chạy `az aks comman
 
 > **Chưa `apply` lên Azure** (theo quy tắc dự án) và chưa chạy workflow trên GitHub thật. Plugin `azurerm` của tflint chưa chạy được ở nơi viết code; CI sẽ chạy.
 > Chi phí: AKS tính tiền theo giờ khi môi trường tồn tại; `cost-guard` cảnh báo môi trường quá TTL. Ước tính chi tiết: task PRD-05.
+
+## Quyền cần có (đã rà theo sandbox FSO-SandboxOps, 10/11/2026)
+
+| Thao tác | Quyền Azure cần | Sandbox có? | Cờ tắt |
+|---|---|---|---|
+| Tạo RG, storage, ACR, identity, federated credential, budget | `Microsoft.Resources/*`, `Microsoft.Storage/*`, `Microsoft.ContainerRegistry/*`, `Microsoft.ManagedIdentity/*`, `Microsoft.Consumption/*` | Có (`*`) | — |
+| Gán role assignment (AcrPull, Grafana reader, Service Bus/Search/Storage data roles) | `Microsoft.Authorization/roleAssignments/write` | **Không** (notActions) | `create_role_assignments = false` |
+| Tạo container Blob (data plane) | `dataActions`: `Microsoft.Storage/storageAccounts/blobServices/containers/write` | **Không** (không có dataActions) | `create_containers = false` |
+| Gán quản trị viên Entra cho PostgreSQL | `microsoft.aadiam/*/write` | **Không** | `create_entra_admin = false` |
+| Tạo AKS/Postgres/Mongo/Redis/Service Bus/Search/Key Vault | các provider tương ứng | Có | — |
+
+Cách kiểm tra quyền của subscription trước khi `apply`:
+
+```bash
+az role definition list --name <role> -o json   # xem notActions / dataActions
+az rest --url "https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
+```
+
+Với sandbox, đặt trong `envs/<env>/*.tfvars`:
+
+```hcl
+create_role_assignments = false
+create_containers       = false
+create_entra_admin      = false
+```
+
+Hạ tầng vẫn tạo được; ba việc trên do tài khoản có quyền (Owner + Storage Blob Data Contributor + Entra admin) chạy sau bằng `az role assignment create`, `az storage container create --auth-mode login`, `az postgres flexible-server ad-admin create`.
