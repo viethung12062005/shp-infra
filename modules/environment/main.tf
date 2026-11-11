@@ -120,6 +120,7 @@ module "aks" {
   apps_pool                  = local.sizing[var.sizing].apps
   enable_ai_pool             = var.enable_ai_pool
   acr_id                     = var.acr_id
+  create_role_assignments    = var.create_role_assignments
 }
 
 module "observability" {
@@ -135,6 +136,7 @@ module "observability" {
   log_analytics_workspace_id   = module.monitoring.log_analytics_workspace_id
   grafana_admin_principal_ids  = var.grafana_admin_principal_ids
   grafana_viewer_principal_ids = var.grafana_viewer_principal_ids
+  create_role_assignments      = var.create_role_assignments
 }
 
 module "identities" {
@@ -163,6 +165,7 @@ module "postgres" {
   backup_retention_days      = local.data.pg_backup_days
   geo_redundant_backup       = local.data.pg_geo_backup
   log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
+  create_entra_admin         = var.create_entra_admin
 }
 
 module "mongodb" {
@@ -236,6 +239,8 @@ module "storage" {
   kb_reader_principal_ids       = { ai = module.identities.principal_ids["ai"] }
   ml_principal_ids              = { ml = module.identities.principal_ids["ml"] }
   audit_writer_principal_ids    = { audit = module.identities.principal_ids["audit"] }
+  create_role_assignments       = var.create_role_assignments
+  create_containers             = var.create_containers
 }
 
 module "search" {
@@ -250,4 +255,5 @@ module "search" {
   replica_count               = local.data.search_replicas
 
   index_contributor_principal_ids = { ai = module.identities.principal_ids["ai"] }
+  create_role_assignments         = var.create_role_assignments
 }

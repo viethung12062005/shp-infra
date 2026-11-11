@@ -63,3 +63,13 @@ variable "action_group_id" {
   type        = string
   default     = null
 }
+
+variable "create_role_assignments" {
+  description = <<-EOT
+    Tạo role assignment của module. Đặt false ở subscription bị chặn Microsoft.Authorization/*/Write
+    (sandbox FSO-SandboxOps): hạ tầng vẫn tạo được, phân quyền do tài khoản Owner chạy sau bằng
+    `az role assignment create`.
+  EOT
+  type        = bool
+  default     = true
+}

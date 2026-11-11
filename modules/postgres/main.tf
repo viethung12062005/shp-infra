@@ -41,6 +41,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "admin" {
+  count               = var.create_entra_admin ? 1 : 0
   server_name         = azurerm_postgresql_flexible_server.this.name
   resource_group_name = var.resource_group_name
   tenant_id           = var.tenant_id

@@ -60,3 +60,21 @@ variable "grafana_viewer_principal_ids" {
   type        = map(string)
   default     = {}
 }
+
+variable "create_role_assignments" {
+  description = "false ở subscription bị chặn Microsoft.Authorization/*/Write (sandbox)."
+  type        = bool
+  default     = true
+}
+
+variable "create_containers" {
+  description = "false ở subscription không có dataActions của Storage (sandbox)."
+  type        = bool
+  default     = true
+}
+
+variable "create_entra_admin" {
+  description = "false khi không có quyền ghi microsoft.aadiam (sandbox)."
+  type        = bool
+  default     = true
+}

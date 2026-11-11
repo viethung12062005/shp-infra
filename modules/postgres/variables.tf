@@ -63,3 +63,12 @@ variable "databases" {
 }
 
 variable "log_analytics_workspace_id" { type = string }
+
+variable "create_entra_admin" {
+  description = <<-EOT
+    Gán quản trị viên Entra cho PostgreSQL. Cần quyền microsoft.aadiam/*/write (hoặc vai trò Entra
+    phù hợp); sandbox cấm ghi aadiam nên đặt false và gán bằng tài khoản có quyền.
+  EOT
+  type        = bool
+  default     = true
+}

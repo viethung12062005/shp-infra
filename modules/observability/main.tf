@@ -164,25 +164,28 @@ resource "azurerm_dashboard_grafana" "this" {
 }
 
 resource "azurerm_role_assignment" "grafana_prometheus" {
+  count                = var.create_role_assignments ? 1 : 0
   scope                = var.monitor_workspace_id
   role_definition_name = "Monitoring Data Reader"
   principal_id         = azurerm_dashboard_grafana.this.identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "grafana_monitor" {
+  count                = var.create_role_assignments ? 1 : 0
   scope                = var.resource_group_id
   role_definition_name = "Monitoring Reader"
   principal_id         = azurerm_dashboard_grafana.this.identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "grafana_logs" {
+  count                = var.create_role_assignments ? 1 : 0
   scope                = var.log_analytics_workspace_id
   role_definition_name = "Log Analytics Reader"
   principal_id         = azurerm_dashboard_grafana.this.identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "grafana_admin" {
-  for_each = var.grafana_admin_principal_ids
+  for_each = var.create_role_assignments ? var.grafana_admin_principal_ids : {}
 
   scope                = azurerm_dashboard_grafana.this.id
   role_definition_name = "Grafana Admin"
@@ -190,7 +193,7 @@ resource "azurerm_role_assignment" "grafana_admin" {
 }
 
 resource "azurerm_role_assignment" "grafana_viewer" {
-  for_each = var.grafana_viewer_principal_ids
+  for_each = var.create_role_assignments ? var.grafana_viewer_principal_ids : {}
 
   scope                = azurerm_dashboard_grafana.this.id
   role_definition_name = "Grafana Viewer"

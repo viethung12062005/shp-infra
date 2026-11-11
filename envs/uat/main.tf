@@ -26,7 +26,12 @@ module "environment" {
     type      = "ServicePrincipal"
   }
 
-  messaging_sku                = var.messaging_sku
+  messaging_sku = var.messaging_sku
+
+  # Sandbox bị chặn Microsoft.Authorization/*/Write và không có dataActions: đặt false trong *.tfvars
+  create_role_assignments      = var.create_role_assignments
+  create_containers            = var.create_containers
+  create_entra_admin           = var.create_entra_admin
   grafana_admin_principal_ids  = var.grafana_admin_principal_ids
   grafana_viewer_principal_ids = var.grafana_viewer_principal_ids
 }
