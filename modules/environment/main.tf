@@ -74,6 +74,14 @@ resource "azurerm_resource_group" "this" {
   tags     = local.tags
 }
 
+# Required tags are enforced with Azure Policy (deny) instead of being set "by convention only" (IAC-04).
+module "tag_policy" {
+  count  = var.create_tag_policy ? 1 : 0
+  source = "../tag-policy"
+
+  resource_group_id = azurerm_resource_group.this.id
+}
+
 module "network" {
   source              = "../network"
   name_prefix         = local.name_prefix

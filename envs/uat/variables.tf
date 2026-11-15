@@ -78,3 +78,9 @@ variable "create_entra_admin" {
   type        = bool
   default     = true
 }
+
+variable "create_tag_policy" {
+  description = "Assign the required-tag policies at the environment resource group scope. Set false when Microsoft.Authorization/*/Write is blocked (sandbox)."
+  type        = bool
+  default     = true
+}

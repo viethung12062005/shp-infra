@@ -56,6 +56,7 @@ resource "azurerm_resource_group_template_deployment" "filters" {
   name                = "sb-filters-${azurerm_servicebus_namespace.this.name}"
   resource_group_name = var.resource_group_name
   deployment_mode     = "Incremental"
+  tags                = var.tags
 
   template_content = jsonencode({
     "$schema"      = "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#"
