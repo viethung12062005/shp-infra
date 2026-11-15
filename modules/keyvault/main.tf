@@ -23,6 +23,16 @@ resource "azurerm_key_vault" "this" {
   }
 }
 
+# The Secrets Store CSI driver in AKS authenticates with the pod's workload identity; it only gets read access,
+# never the vault's management plane.
+resource "azurerm_role_assignment" "secrets_user" {
+  for_each = var.create_role_assignments ? var.secret_reader_principal_ids : {}
+
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = each.value
+}
+
 resource "azurerm_private_endpoint" "this" {
   name                = "pe-${azurerm_key_vault.this.name}"
   resource_group_name = var.resource_group_name

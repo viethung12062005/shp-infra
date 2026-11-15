@@ -13,6 +13,9 @@ locals {
     small = {
       system = { vm_size = "Standard_D2s_v5", min_count = 1, max_count = 2 }
       apps   = { vm_size = "Standard_D4s_v5", min_count = 2, max_count = 4, spot = !local.is_prod }
+      # Ollama: bge-m3 + qwen2.5-7b need about 8-10 GB RAM, so the pool scales to zero when idle. For a GPU SKU
+      # (for example Standard_NC4as_T4_v3) add gpu_driver = "Install" to this object.
+      ai = { vm_size = "Standard_D4s_v5", min_count = 0, max_count = 1, os_disk_size_gb = 128 }
       data = {
         pg_sku           = "B_Standard_B1ms"
         pg_storage_mb    = 32768
@@ -32,6 +35,8 @@ locals {
     prod = {
       system = { vm_size = "Standard_D2s_v5", min_count = 3, max_count = 3 }
       apps   = { vm_size = "Standard_D4s_v5", min_count = 3, max_count = 10, spot = false }
+      # 32 GB RAM and a 256 GB OS disk keep the model cache and images local; the pool still scales to zero.
+      ai = { vm_size = "Standard_D8s_v5", min_count = 0, max_count = 2, os_disk_size_gb = 256 }
       data = {
         pg_sku           = "GP_Standard_D2ds_v5"
         pg_storage_mb    = 131072
@@ -110,6 +115,10 @@ module "keyvault" {
   soft_delete_retention_days  = local.is_prod ? 30 : 7
   private_endpoints_subnet_id = module.network.private_endpoints_subnet_id
   private_dns_zone_id         = module.network.private_dns_zone_ids["privatelink.vaultcore.azure.net"]
+
+  # The ai pod reads the DeepSeek/Gemini keys through the Secrets Store CSI driver with its workload identity.
+  secret_reader_principal_ids = { ai = module.identities.principal_ids["ai"] }
+  create_role_assignments     = var.create_role_assignments
 }
 
 module "aks" {
@@ -126,6 +135,7 @@ module "aks" {
   authorized_ip_ranges       = var.authorized_ip_ranges
   system_pool                = local.sizing[var.sizing].system
   apps_pool                  = local.sizing[var.sizing].apps
+  ai_pool                    = local.sizing[var.sizing].ai
   enable_ai_pool             = var.enable_ai_pool
   acr_id                     = var.acr_id
   create_role_assignments    = var.create_role_assignments
@@ -155,6 +165,20 @@ module "identities" {
   tags                = local.tags
   oidc_issuer_url     = module.aks.oidc_issuer_url
   services            = local.services
+}
+
+# One-time cluster objects for the ai workload (Ollama model cache + Key Vault CSI reference). Opt-in: the
+# Kubernetes provider needs a kubeconfig, which does not exist during the first apply that creates the cluster.
+module "ai_workload" {
+  source = "../ai-workload"
+
+  enabled                = var.enable_ai_workload && var.enable_ai_pool
+  kubeconfig_path        = var.kubeconfig_path
+  key_vault_name         = module.keyvault.name
+  tenant_id              = var.tenant_id
+  ai_client_id           = module.identities.client_ids["ai"]
+  model_cache_size       = var.ai_model_cache_size
+  key_vault_secret_names = var.ai_key_vault_secret_names
 }
 
 module "postgres" {

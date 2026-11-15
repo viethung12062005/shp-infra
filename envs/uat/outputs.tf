@@ -19,6 +19,20 @@ output "malware_scan_results_queue" {
   value       = module.environment.malware_scan_results_queue
 }
 
+output "ai_pool_name" {
+  value = module.environment.ai_pool_name
+}
+
+output "ai_model_cache_pvc" {
+  description = "Ollama model cache PVC once enable_ai_workload is applied; null on the first apply."
+  value       = module.environment.ai_model_cache_pvc
+}
+
+output "ai_service_values" {
+  description = "Values to copy into shp-gitops envs/uat/ai/values.yaml (SCF-06)."
+  value       = module.environment.ai_service_values
+}
+
 output "workload_identity_client_ids" {
   description = "service -> clientId; goes into workloadIdentity.clientId in shp-gitops."
   value       = module.environment.workload_identity_client_ids

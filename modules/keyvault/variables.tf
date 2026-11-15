@@ -17,3 +17,18 @@ variable "soft_delete_retention_days" {
 
 variable "private_endpoints_subnet_id" { type = string }
 variable "private_dns_zone_id" { type = string }
+
+variable "secret_reader_principal_ids" {
+  description = "Identities allowed to read secrets through the Secrets Store CSI driver (Key Vault Secrets User), for example the ai workload identity."
+  type        = map(string)
+  default     = {}
+}
+
+variable "create_role_assignments" {
+  description = <<-EOT
+    Create the module's role assignments. Set false where Microsoft.Authorization/*/Write is blocked (sandbox);
+    the Owner runs `az role assignment create` afterwards.
+  EOT
+  type        = bool
+  default     = true
+}

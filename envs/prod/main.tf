@@ -18,6 +18,8 @@ module "environment" {
   ttl_hours            = var.ttl_hours
   enable_ai_pool       = var.enable_ai_pool
   enable_malware_scan  = var.enable_malware_scan
+  enable_ai_workload   = var.enable_ai_workload
+  kubeconfig_path      = var.kubeconfig_path
   authorized_ip_ranges = var.authorized_ip_ranges
 
   # The identity that runs Terraform is the Entra administrator of PostgreSQL (the server has no password)

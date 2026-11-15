@@ -25,3 +25,49 @@ output "workload_identity_names" {
   description = "service -> managed identity name; scheduling uses it as SPRING_DATASOURCE_USERNAME in shp-gitops."
   value       = module.identities.names
 }
+
+output "ai_pool_name" {
+  value = module.aks.ai_pool_name
+}
+
+output "ai_pool_node_labels" {
+  description = "nodeSelector for the ai-service and Ollama pods."
+  value       = module.aks.ai_pool_node_labels
+}
+
+output "ai_pool_node_taints" {
+  description = "Taints the ai-service and Ollama pods must tolerate."
+  value       = module.aks.ai_pool_node_taints
+}
+
+output "ai_model_cache_pvc" {
+  value = module.ai_workload.model_cache_pvc_name
+}
+
+output "ai_key_vault_secret_provider_class" {
+  value = module.ai_workload.secret_provider_class_name
+}
+
+output "ai_service_values" {
+  description = "Copy into shp-gitops envs/<env>/ai/values.yaml (SCF-06): pin the pod to the ai pool and load the API keys through the CSI driver."
+  value = {
+    nodeSelector = module.aks.ai_pool_node_labels
+    tolerations = var.enable_ai_pool ? [{
+      key      = "workload"
+      operator = "Equal"
+      value    = "ai"
+      effect   = "NoSchedule"
+    }] : []
+    resources = {
+      requests = { memory = "8Gi" }
+      limits   = { memory = "10Gi" }
+    }
+    keyVault = {
+      enabled  = true
+      name     = module.keyvault.name
+      tenantId = var.tenant_id
+      objects  = [for name in var.ai_key_vault_secret_names : { name = name, type = "secret" }]
+    }
+    workloadIdentity = { clientId = module.identities.client_ids["ai"] }
+  }
+}

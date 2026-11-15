@@ -104,8 +104,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai" {
   auto_scaling_enabled  = true
   min_count             = var.ai_pool.min_count
   max_count             = var.ai_pool.max_count
-  os_disk_size_gb       = 128
-  node_labels           = { "shp/pool" = "ai" }
+  os_disk_size_gb       = var.ai_pool.os_disk_size_gb
+  os_disk_type          = "Managed"
+  gpu_driver            = var.ai_pool.gpu_driver
+  max_pods              = var.ai_pool.max_pods
+  node_labels           = { "shp/pool" = "ai", "shp/workload" = "ollama" }
   node_taints           = ["workload=ai:NoSchedule"]
   tags                  = var.tags
 

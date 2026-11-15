@@ -44,6 +44,30 @@ variable "enable_malware_scan" {
   default     = true
 }
 
+variable "enable_ai_workload" {
+  description = "Create the Ollama model-cache PVC and the ai Key Vault SecretProviderClass. Requires a kubeconfig, so it runs as a second apply after the cluster exists."
+  type        = bool
+  default     = false
+}
+
+variable "kubeconfig_path" {
+  description = "Path to a kubeconfig that can reach the provisioned cluster; used only when enable_ai_workload is true."
+  type        = string
+  default     = null
+}
+
+variable "ai_model_cache_size" {
+  description = "Size of the Ollama model cache PVC (bge-m3 + qwen2.5-7b)."
+  type        = string
+  default     = "100Gi"
+}
+
+variable "ai_key_vault_secret_names" {
+  description = "Key Vault secret names mounted into the ai pod through the Secrets Store CSI driver. The values stay only in Key Vault."
+  type        = list(string)
+  default     = ["deepseek-api-key", "gemini-api-key"]
+}
+
 variable "authorized_ip_ranges" {
   type = list(string)
 }

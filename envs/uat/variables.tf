@@ -44,6 +44,18 @@ variable "enable_malware_scan" {
   default     = true
 }
 
+variable "enable_ai_workload" {
+  description = "Create the Ollama model-cache PVC and the ai CSI SecretProviderClass. Needs a kubeconfig, so it runs as a second apply after the cluster exists."
+  type        = bool
+  default     = false
+}
+
+variable "kubeconfig_path" {
+  description = "Kubeconfig path used by the ai-workload module; only needed when enable_ai_workload is true."
+  type        = string
+  default     = null
+}
+
 variable "authorized_ip_ranges" {
   description = "CIDRs allowed to call the AKS API server (for example the SA's public IP/32). Required."
   type        = list(string)
