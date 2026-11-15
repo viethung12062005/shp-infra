@@ -46,14 +46,14 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: azure/login@2035af27c2cea8ff426397d10e3edb28906b51df # v2.3.1
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID_CI_PLAN }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.9.8"
           terraform_wrapper: false
@@ -81,7 +81,7 @@ jobs:
           if [ "$SIZING" != default ]; then args+=(-var "sizing=$SIZING"); fi
           terraform plan -out=tfplan "${args[@]}"
           { echo '### Change plan'; echo '```'; terraform show -no-color tfplan | head -300; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tfplan-${{ inputs.environment }}
           path: envs/${{ inputs.environment }}/tfplan
@@ -95,18 +95,18 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: azure/login@2035af27c2cea8ff426397d10e3edb28906b51df # v2.3.1
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ inputs.environment == 'prod' && vars.AZURE_CLIENT_ID_INFRA_PROD || vars.AZURE_CLIENT_ID_INFRA_UAT }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.9.8"
           terraform_wrapper: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: tfplan-${{ inputs.environment }}
           path: envs/${{ inputs.environment }}
@@ -133,13 +133,13 @@ jobs:
       # GitHub App (repo-creds for the whole owner). Commands run with `az aks command invoke`, so the API server stays
       # closed to the runner. Synthetic data seeding and smoke tests are not automated yet.
       - id: repo-app
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.ARGOCD_REPO_APP_ID }}
           private-key: ${{ secrets.ARGOCD_REPO_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: shp-gitops
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/shp-gitops
           token: ${{ steps.repo-app.outputs.token }}
