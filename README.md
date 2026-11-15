@@ -26,6 +26,7 @@ envs/uat, prod    two stacks; they differ in sizing and protection level (purge 
 - AKS: Entra ID RBAC (local accounts off), Workload Identity, Azure CNI Overlay + Cilium, Key Vault CSI, spread over 3 availability zones, **API server reachable only from the declared IP ranges** (`authorized_ip_ranges`, required, `0.0.0.0/0` forbidden).
 - Key Vault: RBAC, not public, private endpoint; purge protection on in prod. The name has a random suffix so the environment can be rebuilt.
 - Bootstrap through `az aks command invoke` (the API server is not opened to the runner).
+- Required tags are enforced, not set by convention only: the `environment` module assigns the built-in "Require a tag on resources" and "Require a tag on resource groups" policies (both deny) at the resource group scope for `shp-env`, `created-at` and `ttl-hours`. Set `create_tag_policy = false` in `envs/<env>/*.tfvars` where `Microsoft.Authorization/*/Write` is blocked (sandbox).
 
 ## Data services, messaging and monitoring
 

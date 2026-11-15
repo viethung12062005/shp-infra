@@ -94,3 +94,12 @@ variable "create_entra_admin" {
   type        = bool
   default     = true
 }
+
+variable "create_tag_policy" {
+  description = <<-EOT
+    Assign the required-tag policies (shp-env, created-at, ttl-hours) at the environment resource group scope.
+    Set false where Microsoft.Authorization/*/Write is blocked (sandbox); the policy assignments are then skipped.
+  EOT
+  type        = bool
+  default     = true
+}

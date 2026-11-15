@@ -32,6 +32,7 @@ module "environment" {
   create_role_assignments      = var.create_role_assignments
   create_containers            = var.create_containers
   create_entra_admin           = var.create_entra_admin
+  create_tag_policy            = var.create_tag_policy
   grafana_admin_principal_ids  = var.grafana_admin_principal_ids
   grafana_viewer_principal_ids = var.grafana_viewer_principal_ids
 }
