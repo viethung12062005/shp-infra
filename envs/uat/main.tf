@@ -28,7 +28,7 @@ module "environment" {
 
   messaging_sku = var.messaging_sku
 
-  # Sandbox bị chặn Microsoft.Authorization/*/Write và không có dataActions: đặt false trong *.tfvars
+  # The Sandbox blocks Microsoft.Authorization/*/Write and has no dataActions: set false in *.tfvars
   create_role_assignments      = var.create_role_assignments
   create_containers            = var.create_containers
   create_entra_admin           = var.create_entra_admin
