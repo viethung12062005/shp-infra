@@ -15,7 +15,7 @@ jobs:
       id-token: write
       issues: write
     steps:
-      - uses: azure/login@2035af27c2cea8ff426397d10e3edb28906b51df # v2.3.1
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID_CI_PLAN }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
