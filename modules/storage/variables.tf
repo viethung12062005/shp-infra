@@ -24,12 +24,6 @@ variable "audit_retention_locked" {
   default     = false
 }
 
-variable "defender_malware_scan" {
-  description = "Microsoft Defender for Storage scans uploaded documents for malware. Charged by scanned volume."
-  type        = bool
-  default     = false
-}
-
 # Identities granted data access (no account keys)
 variable "document_writer_principal_ids" {
   description = "Read/write the documents and quarantine containers (document service)."

@@ -38,6 +38,12 @@ variable "enable_ai_pool" {
   default = true
 }
 
+variable "enable_malware_scan" {
+  description = "Defender for Storage malware scanning and Event Grid routing to the document queue. Charged per scanned GB, capped."
+  type        = bool
+  default     = true
+}
+
 variable "authorized_ip_ranges" {
   description = "CIDRs allowed to call the AKS API server (for example the SA's public IP/32). Required."
   type        = list(string)

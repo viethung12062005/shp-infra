@@ -50,6 +50,20 @@ resource "azurerm_servicebus_subscription" "consumer" {
   dead_lettering_on_filter_evaluation_error = true
 }
 
+# Point-to-point queues for non-event payloads; the first user is the Defender malware scan result for the document service.
+resource "azurerm_servicebus_queue" "this" {
+  for_each = var.queues
+
+  name         = each.key
+  namespace_id = azurerm_servicebus_namespace.this.id
+
+  max_delivery_count                   = each.value.max_delivery_count
+  default_message_ttl                  = each.value.default_message_ttl
+  lock_duration                        = "PT1M"
+  requires_session                     = each.value.requires_session
+  dead_lettering_on_message_expiration = each.value.dead_lettering_on_message_expiration
+}
+
 # A new subscription always has the default rule `$Default` (receives everything). The provider cannot create/change a rule with that
 # name, so it is overwritten through ARM (PUT is an upsert) so that each consumer receives only its own event types and no other service's events leak.
 resource "azurerm_resource_group_template_deployment" "filters" {
@@ -98,6 +112,14 @@ resource "azurerm_role_assignment" "receiver" {
   for_each = var.create_role_assignments ? var.receiver_principal_ids : {}
 
   scope                = azurerm_servicebus_subscription.consumer[each.key].id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = each.value
+}
+
+resource "azurerm_role_assignment" "queue_receiver" {
+  for_each = var.create_role_assignments ? var.queue_receiver_principal_ids : {}
+
+  scope                = azurerm_servicebus_queue.this[each.key].id
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = each.value
 }

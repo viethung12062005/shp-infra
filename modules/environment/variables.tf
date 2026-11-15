@@ -38,6 +38,12 @@ variable "enable_ai_pool" {
   default = true
 }
 
+variable "enable_malware_scan" {
+  description = "Microsoft Defender for Storage scans new documents and routes results to the document queue (charged per scanned GB, capped)."
+  type        = bool
+  default     = true
+}
+
 variable "authorized_ip_ranges" {
   type = list(string)
 }

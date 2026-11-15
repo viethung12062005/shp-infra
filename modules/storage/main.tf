@@ -122,14 +122,6 @@ resource "azurerm_storage_management_policy" "docs" {
   }
 }
 
-resource "azurerm_security_center_storage_defender" "docs" {
-  count = var.defender_malware_scan ? 1 : 0
-
-  storage_account_id                          = azurerm_storage_account.this["docs"].id
-  malware_scanning_on_upload_enabled          = true
-  malware_scanning_on_upload_cap_gb_per_month = 100
-}
-
 # ---- data access by least privilege, assigned at container level
 resource "azurerm_role_assignment" "documents" {
   for_each = var.create_containers && var.create_role_assignments ? {
