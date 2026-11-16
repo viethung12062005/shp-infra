@@ -19,7 +19,7 @@ envs/uat, prod    two stacks; they differ in sizing and protection level (purge 
 3. **Destroy an environment:** Actions → `env-destroy` → type `destroy-<env>`.
 
 **Who may run them:** only the repo owner. The current GitHub plan does not allow Environment reviewers on a private repo, so each workflow checks `github.triggering_actor` itself and stops at once if it is not the repo owner. To see the plan before apply: run `ci` on a PR, or read the Summary of the `plan` job.
-4. Every infrastructure code change goes through a PR; `ci` only runs static checks (fmt, validate, tflint, Trivy) and **never applies**.
+4. Every infrastructure code change goes through a PR; `ci` runs static checks (fmt, validate, tflint, Trivy) and a read-only `terraform plan` for `envs/uat`, and **never applies**.
 
 ## Security (defaults)
 - No secrets in the repo: Azure OIDC federated credentials, least privilege per identity; state in a Storage Account with shared keys off and versioning on.
@@ -58,10 +58,10 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 
 `AZURE_CLIENT_ID_CHART_PUSH` (the identity that pushes the Helm chart) is set in the **shp-platform-templates** repo; `AZURE_CLIENT_ID_ACR_PUSH` is set in the application repo.
 
-**Azure trusts the `main` branch only:**
-- Identities bound to a `ref` (`ci-plan`: this repo; `acr-push`: the application repo) only get a token from `refs/heads/main`. Another branch, a PR or a fork has a different subject, so Azure refuses it.
+**Azure trusts the `main` branch and this repo's own pull requests:**
+- Identities bound to a `ref` (`ci-plan`: this repo; `acr-push`: the application repo) only get a token from `refs/heads/main`. `ci-plan` additionally trusts this repo's `pull_request` subject, so the CI plan job can sign in on a PR with read-only access.
 - Identities bound to an Environment (`infra-<env>`, `infra-<env>-destroy`, `release-chart`) rely on the *deployment branch policy*: the Environment only allows the `main` branch (`release-chart` only allows `chart-v*` tags). A job on another branch is rejected by GitHub before it can request a token. Verified on the current plan with a test branch.
-- Not used by CI on pull requests: a PR only runs static checks and never signs in to Azure.
+- CI on pull requests signs in to Azure only with the read-only `ci-plan` identity to run `terraform plan` for `envs/uat`; it never applies. Fork PRs are skipped (GitHub withholds variables and refuses OIDC tokens for them).
 
 For the ENV-01 step (Argo CD reading private repos): a **read-only** GitHub App (`Contents: Read`, `Metadata: Read`) installed on `shp-gitops` and `shp-platform-templates`.
 Variables `ARGOCD_REPO_APP_ID`, `ARGOCD_REPO_APP_INSTALLATION_ID`; secret `ARGOCD_REPO_APP_PRIVATE_KEY`.

@@ -43,8 +43,9 @@ manage_state_container  = false   # do not create the container through Entra (n
 acr_sku                 = "Basic" # depending on the budget
 ```
 
-`terraform apply` then creates 19 resources: the resource group, the storage account (versioning, 30-day soft delete, shared
-keys off), ACR (admin off), 6 managed identities + federated credentials for GitHub OIDC, and the monthly budget.
+`terraform apply` then creates 20 resources: the resource group, the storage account (versioning, 30-day soft delete, shared
+keys off), ACR (admin off), 7 managed identities + 8 federated credentials for GitHub OIDC (the read-only `ci-plan`
+identity has one credential for the `main` ref and one for this repo's pull requests), and the monthly budget.
 
 Two things remain that need an **Owner** account on the subscription (once):
 

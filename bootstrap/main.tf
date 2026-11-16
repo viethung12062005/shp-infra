@@ -101,6 +101,18 @@ resource "azurerm_federated_identity_credential" "github" {
   audience            = ["api://AzureADTokenExchange"]
 }
 
+# The read-only plan identity (ci-plan) is also used by CI on pull requests (CIT-05): add a second federated
+# credential that trusts the pull_request subject so the PR plan job can sign in with the same identity. The
+# credential above only trusts refs/heads/main, so a PR subject would otherwise be rejected.
+resource "azurerm_federated_identity_credential" "ci_plan_pull_request" {
+  name                = "github-ci-plan-pull-request"
+  resource_group_name = azurerm_resource_group.shared.name
+  parent_id           = azurerm_user_assigned_identity.github["ci-plan"].id
+  issuer              = local.github_issuer
+  subject             = "repo:${var.github_owner}/${var.infra_repo}:pull_request"
+  audience            = ["api://AzureADTokenExchange"]
+}
+
 # ---------- Budget ----------
 resource "azurerm_consumption_budget_subscription" "monthly" {
   name            = "budget-shp-monthly"
