@@ -60,12 +60,29 @@ variable "enable_ai_pool" {
 }
 
 variable "ai_pool" {
+  description = <<-EOT
+    Tainted node pool for ai-service and Ollama. It scales to zero when idle and carries a large OS disk for the
+    container images and model cache. Use a GPU SKU (for example Standard_NC4as_T4_v3) with gpu_driver = "Install"
+    when GPU inference is required; the default CPU SKU fits bge-m3 + qwen2.5-7b (ADR-0013).
+  EOT
   type = object({
-    vm_size   = string
-    min_count = number
-    max_count = number
+    vm_size         = string
+    min_count       = number
+    max_count       = number
+    os_disk_size_gb = optional(number, 256)
+    gpu_driver      = optional(string, null)
+    max_pods        = optional(number, 50)
   })
-  default = { vm_size = "Standard_D4s_v5", min_count = 0, max_count = 2 }
+  default = { vm_size = "Standard_D8s_v5", min_count = 0, max_count = 2 }
+
+  validation {
+    condition     = var.ai_pool.min_count >= 0 && var.ai_pool.max_count >= var.ai_pool.min_count
+    error_message = "ai_pool.min_count must be >= 0 and ai_pool.max_count must be >= ai_pool.min_count."
+  }
+  validation {
+    condition     = var.ai_pool.gpu_driver == null || contains(["Install", "None"], var.ai_pool.gpu_driver)
+    error_message = "ai_pool.gpu_driver must be null, \"Install\" or \"None\"."
+  }
 }
 
 variable "acr_id" { type = string }
