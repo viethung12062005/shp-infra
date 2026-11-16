@@ -227,6 +227,17 @@ module "servicebus" {
   # Every service emits audit (E11), so all of them may send; only consumers with a subscription may receive
   sender_principal_ids   = module.identities.principal_ids
   receiver_principal_ids = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
+
+  # Defender for Storage writes malware scan results here; the document service is the only consumer.
+  queues = {
+    malware-scan-results = {
+      max_delivery_count  = 10
+      default_message_ttl = "P1D"
+    }
+  }
+  queue_receiver_principal_ids = {
+    malware-scan-results = module.identities.principal_ids["document"]
+  }
 }
 
 module "storage" {
@@ -241,7 +252,6 @@ module "storage" {
   replication_type            = local.data.replication
   audit_retention_days        = local.is_prod ? 3650 : 1
   audit_retention_locked      = local.is_prod
-  defender_malware_scan       = local.is_prod
 
   document_writer_principal_ids = { document = module.identities.principal_ids["document"] }
   kb_reader_principal_ids       = { ai = module.identities.principal_ids["ai"] }
@@ -249,6 +259,20 @@ module "storage" {
   audit_writer_principal_ids    = { audit = module.identities.principal_ids["audit"] }
   create_role_assignments       = var.create_role_assignments
   create_containers             = var.create_containers
+}
+
+module "defender_storage" {
+  source = "../defender-storage"
+
+  name_prefix                = local.name_prefix
+  resource_group_name        = azurerm_resource_group.this.name
+  location                   = var.location
+  tags                       = local.tags
+  storage_account_id         = module.storage.docs_account_id
+  servicebus_queue_id        = module.servicebus.queue_ids["malware-scan-results"]
+  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
+  enabled                    = var.enable_malware_scan
+  create_role_assignments    = var.create_role_assignments
 }
 
 module "search" {

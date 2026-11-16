@@ -14,6 +14,11 @@ output "key_vault_name" {
   value = module.environment.key_vault_name
 }
 
+output "malware_scan_results_queue" {
+  description = "Queue the document service consumes for Defender malware scan results."
+  value       = module.environment.malware_scan_results_queue
+}
+
 output "workload_identity_client_ids" {
   description = "service -> clientId; goes into workloadIdentity.clientId in shp-gitops."
   value       = module.environment.workload_identity_client_ids

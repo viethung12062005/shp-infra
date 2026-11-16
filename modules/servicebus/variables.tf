@@ -46,6 +46,27 @@ variable "subscriptions" {
   }
 }
 
+variable "queues" {
+  description = "Point-to-point queues, keyed by queue name (for example the Defender malware scan results)."
+  type = map(object({
+    max_delivery_count                   = optional(number, 10)
+    default_message_ttl                  = optional(string, "P1D")
+    requires_session                     = optional(bool, false)
+    dead_lettering_on_message_expiration = optional(bool, true)
+  }))
+  default = {}
+}
+
+variable "queue_receiver_principal_ids" {
+  description = "Queue name -> principal id allowed to receive from it (Azure Service Bus Data Receiver); every key must exist in `queues`."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition     = alltrue([for q in keys(var.queue_receiver_principal_ids) : contains(keys(var.queues), q)])
+    error_message = "Every key in queue_receiver_principal_ids must be a queue declared in queues."
+  }
+}
+
 variable "sender_principal_ids" {
   description = "Identities allowed to publish events to the topic (every service emits audit E11, so usually all of them)."
   type        = map(string)

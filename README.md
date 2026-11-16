@@ -7,7 +7,7 @@ Azure infrastructure in Terraform for the Smart Hospital Platform. Decisions: AD
 ```
 bootstrap/        always-on resources: state, ACR, GitHub OIDC identities, budget   (run by hand ONCE)
 modules/          network · monitoring · keyvault · aks · environment (composes the modules below)
-                  data: postgres · mongodb · redis · servicebus · storage · search · private-endpoint
+                  data: postgres · mongodb · redis · servicebus · storage · search · private-endpoint · defender-storage
                   identity and monitoring: workload-identity · observability (Managed Prometheus + Grafana)
 envs/uat, prod    two stacks; they differ in sizing and protection level (purge protection, AKS SKU)
 .github/workflows ci · env-provision · env-destroy · cost-guard
@@ -25,6 +25,7 @@ envs/uat, prod    two stacks; they differ in sizing and protection level (purge 
 - No secrets in the repo: Azure OIDC federated credentials, least privilege per identity; state in a Storage Account with shared keys off and versioning on.
 - AKS: Entra ID RBAC (local accounts off), Workload Identity, Azure CNI Overlay + Cilium, Key Vault CSI, spread over 3 availability zones, **API server reachable only from the declared IP ranges** (`authorized_ip_ranges`, required, `0.0.0.0/0` forbidden).
 - Key Vault: RBAC, not public, private endpoint; purge protection on in prod. The name has a random suffix so the environment can be rebuilt.
+- Defender for Storage scan results go to a keyless Event Grid topic (Entra ID, TLS 1.2) whose public endpoint is required by Defender; the subscription delivers to the queue with a system-assigned managed identity (no SAS key).
 - Bootstrap through `az aks command invoke` (the API server is not opened to the runner).
 - Required tags are enforced, not set by convention only: the `environment` module assigns the built-in "Require a tag on resources" and "Require a tag on resource groups" policies (both deny) at the resource group scope for `shp-env`, `created-at` and `ttl-hours`. Set `create_tag_policy = false` in `envs/<env>/*.tfvars` where `Microsoft.Authorization/*/Write` is blocked (sandbox).
 
@@ -37,8 +38,9 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 | `postgres` | PostgreSQL Flexible Server, database `scheduling` | scheduling | Inside the VNet, no public address, Entra ID sign-in only (passwords off), `btree_gist` extension |
 | `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, public access off, one Entra user per service with `readWrite` on its own database only |
 | `redis` | Azure Managed Redis | gateway (rate limiting), scheduling (slot cache) | Private endpoint, access keys off, Entra ID only |
-| `servicebus` | Service Bus, topic `shp-events`, 7 filtered subscriptions, DLQ after 5 deliveries | everyone (publish), consumers (receive) | SAS keys off, Entra ID, TLS 1.2; Premium has a private endpoint |
+| `servicebus` | Service Bus, topic `shp-events`, 7 filtered subscriptions, the `malware-scan-results` queue, DLQ after 5 deliveries | everyone (publish), consumers (receive), document (scan results) | SAS keys off, Entra ID, TLS 1.2; Premium has a private endpoint |
 | `storage` | Two storage accounts: documents (`documents`, `quarantine`, `kb`, `mlops`) and WORM audit | document, ai, ml, audit | Shared keys off, private endpoint, versioning and 14-day soft delete; immutable audit (prod 10 years, locked) |
+| `defender-storage` | Defender for Storage malware scanning; Event Grid custom topic and subscription route `Microsoft.Security.MalwareScanningResult` into the `malware-scan-results` queue | document | Topic keyless (Entra ID), delivery with a system-assigned identity; the topic must allow public access because Defender cannot publish to private-endpoint-only topics, and its events carry no clinical data |
 | `search` | Azure AI Search | ai | API keys off, private endpoint |
 | `workload-identity` | One managed identity + federated credential per service | everyone | Pods sign in with the ServiceAccount token, no passwords |
 | `observability` | Managed Prometheus (AKS metrics, 4 infrastructure alerts) and Managed Grafana | SA, DevOps | Grafana allows Entra ID sign-in only and issues no API keys |
@@ -48,6 +50,7 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 2. Fill `workloadIdentity.clientId` and `serviceAccount.name: <service>` into each service's values in `shp-gitops` (the ServiceAccount name equals the service name, namespace `shp-apps`).
 3. Service Bus: the format of the `type` property used in the filters must match how the event library writes CloudEvents (see `13-events.md`); check with a test event before enabling consumers.
 4. Mongo: the root administrator account (`shpadmin`) exists only in the state and no service uses it. After provisioning, turn off `NativeAuth` in prod once Entra sign-in is confirmed to work.
+5. Defender for Storage: the subscription needs the Defender for Storage plan before `enable_malware_scan = true` can apply; set it to `false` where the sandbox blocks the plan. The first scan result appears in the `malware-scan-results` queue after an upload.
 
 **Cost while an environment is up (per hour, estimated from public list prices):** Service Bus Premium is the largest item (about 0.9 USD/hour), followed by Cosmos DB MongoDB vCore M10 and AI Search Basic. A test environment lives at most 8 hours (cost-guard), so this is significant but bounded. To make it cheaper while the queue does not need a private endpoint yet: set `messaging_sku = "Standard"` (the namespace opens a public endpoint, Entra ID only; events carry patient ids, so **do not use it for real data**).
 
@@ -70,7 +73,8 @@ The identity `AZURE_CLIENT_ID_INFRA_<ENV>` additionally needs permission to run 
 ## Done / still missing
 | Done (`fmt` + `validate` + tflint + Trivy clean) | Remaining (backlog) |
 |---|---|
-| bootstrap, network, monitoring, Key Vault, AKS (3 node pools), 2 stacks, 4 workflows | IAC-09..14 data modules (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search), IAC-15 workload identity per service, IAC-16 Entra app, IAC-18/19 Defender + Azure OpenAI |
+| bootstrap, network, monitoring, Key Vault, AKS (3 node pools), 2 stacks, 4 workflows | IAC-15 workload identity per service, IAC-16 Entra app, IAC-19 AI workload + Azure OpenAI |
+| IAC-09..14 data modules (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search); IAC-18 Defender for Storage + Event Grid scan results | |
 | | OBS-01: connect Managed Prometheus (needs a data collection rule), Grafana |
 | ENV-01: `env-provision` installs Argo CD and hands the cluster to GitOps (not yet tried on real Azure) | Rest of ENV-01: load synthetic data, smoke test after provisioning |
 

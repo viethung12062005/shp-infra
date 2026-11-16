@@ -17,6 +17,7 @@ module "environment" {
   created_at           = var.created_at
   ttl_hours            = var.ttl_hours
   enable_ai_pool       = var.enable_ai_pool
+  enable_malware_scan  = var.enable_malware_scan
   authorized_ip_ranges = var.authorized_ip_ranges
 
   # The identity that runs Terraform is the Entra administrator of PostgreSQL (the server has no password)
