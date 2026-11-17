@@ -249,8 +249,9 @@ module "servicebus" {
   log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
 
   # Every service emits audit (E11), so all of them may send; only consumers with a subscription may receive
-  sender_principal_ids   = module.identities.principal_ids
-  receiver_principal_ids = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
+  create_role_assignments = var.create_role_assignments
+  sender_principal_ids    = module.identities.principal_ids
+  receiver_principal_ids  = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
 
   # Defender for Storage writes malware scan results here; the document service is the only consumer.
   queues = {
