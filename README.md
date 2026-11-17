@@ -7,6 +7,7 @@ Azure infrastructure in Terraform for the Smart Hospital Platform. Decisions: AD
 ```
 bootstrap/        always-on resources: state, ACR, GitHub OIDC identities, budget   (run by hand ONCE)
 modules/          network · monitoring · keyvault · aks · environment (composes the modules below)
+                  identity provider: keycloak-infra (IAM PostgreSQL, workload identity, secrets in Key Vault)
                   data: postgres · mongodb · redis · servicebus · storage · search · private-endpoint · defender-storage
                   workload: ai-workload (Ollama model cache + Key Vault CSI reference)
                   identity and monitoring: workload-identity · observability (Managed Prometheus + Grafana)
@@ -44,6 +45,7 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 | `storage` | Two storage accounts: documents (`documents`, `quarantine`, `kb`, `mlops`) and WORM audit | document, ai, ml, audit | Shared keys off, private endpoint, versioning and 14-day soft delete; immutable audit (prod 10 years, locked) |
 | `defender-storage` | Defender for Storage malware scanning; Event Grid custom topic and subscription route `Microsoft.Security.MalwareScanningResult` into the `malware-scan-results` queue | document | Topic keyless (Entra ID), delivery with a system-assigned identity; the topic must allow public access because Defender cannot publish to private-endpoint-only topics, and its events carry no clinical data |
 | `search` | Azure AI Search | ai | API keys off, private endpoint |
+| `keycloak-infra` | A second PostgreSQL Flexible Server (database `keycloak`), identity `id-<prefix>-keycloak`, secrets in Key Vault | Keycloak (namespace `shp-iam`) | Dedicated server (own backups, restore and HA), Entra sign-in on, one password login only in `db_auth = password` mode, generated with `random_password`, stored in Key Vault, never an output; the identity reads only its own secrets |
 | `workload-identity` | One managed identity + federated credential per service | everyone | Pods sign in with the ServiceAccount token, no passwords |
 | `ai-workload` | AKS `ai` node pool (tainted, scales to zero, 256 GB OS disk, GPU-capable) plus the Ollama model-cache PVC and the ai `SecretProviderClass` | ai, Ollama | The ai identity has `Key Vault Secrets User` only; secret values never enter Terraform state or Helm values |
 | `observability` | Managed Prometheus (AKS metrics, 4 infrastructure alerts) and Managed Grafana | SA, DevOps | Grafana allows Entra ID sign-in only and issues no API keys |
@@ -81,6 +83,7 @@ The identity `AZURE_CLIENT_ID_INFRA_<ENV>` additionally needs permission to run 
 | IAC-09..14 data modules (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search); IAC-18 Defender for Storage + Event Grid scan results | |
 | IAC-19 ai node pool + Ollama model-cache PVC + Key Vault CSI reference (the PVC/CSI objects are a second, opt-in apply) | |
 | | OBS-01: connect Managed Prometheus (needs a data collection rule), Grafana |
+| IAC-16: Keycloak infrastructure (IAM PostgreSQL, identity, Key Vault secrets). The `/idp` route and the NetworkPolicy are Kubernetes objects in `shp-gitops` (IAM-01) | |
 | ENV-01: `env-provision` installs Argo CD and hands the cluster to GitOps (not yet tried on real Azure) | Rest of ENV-01: load synthetic data, smoke test after provisioning |
 
 > **Not yet `apply`-ed to Azure** (per the project rule) and the workflows have not run on real GitHub. The tflint `azurerm` plugin could not run where the code was written; CI runs it.
