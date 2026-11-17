@@ -151,3 +151,21 @@ variable "extra_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "aks_private_cluster" {
+  description = "Make the AKS API server private. Needed where a subscription policy requires private clusters."
+  type        = bool
+  default     = false
+}
+
+variable "aks_local_accounts_enabled" {
+  description = "Keep AKS local admin accounts (default off, Entra ID only). For subscriptions where role assignments are blocked."
+  type        = bool
+  default     = false
+}
+
+variable "aks_entra_rbac_enabled" {
+  description = "Entra ID integration with Azure RBAC for Kubernetes (default on). Turn off only together with aks_local_accounts_enabled."
+  type        = bool
+  default     = true
+}

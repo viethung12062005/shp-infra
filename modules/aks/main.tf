@@ -10,15 +10,19 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Identity and security
   oidc_issuer_enabled               = true
   workload_identity_enabled         = true
-  local_account_disabled            = true
+  local_account_disabled            = !var.local_accounts_enabled
+  private_cluster_enabled           = var.private_cluster_enabled
   role_based_access_control_enabled = true
   image_cleaner_enabled             = true
   automatic_upgrade_channel         = "patch"
   node_os_upgrade_channel           = "NodeImage"
 
-  azure_active_directory_role_based_access_control {
-    azure_rbac_enabled = true
-    tenant_id          = var.tenant_id
+  dynamic "azure_active_directory_role_based_access_control" {
+    for_each = var.entra_rbac_enabled ? [1] : []
+    content {
+      azure_rbac_enabled = true
+      tenant_id          = var.tenant_id
+    }
   }
 
   identity {
@@ -64,8 +68,12 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Managed Prometheus: enables the metrics agent; scrape rules and the destination live in the observability module
   monitor_metrics {}
 
-  api_server_access_profile {
-    authorized_ip_ranges = var.authorized_ip_ranges
+  # A private cluster has no public endpoint, so there is nothing to restrict
+  dynamic "api_server_access_profile" {
+    for_each = var.private_cluster_enabled ? [] : [1]
+    content {
+      authorized_ip_ranges = var.authorized_ip_ranges
+    }
   }
 
   lifecycle {

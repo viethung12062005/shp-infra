@@ -136,6 +136,9 @@ module "aks" {
   subnet_id                  = module.network.aks_subnet_id
   log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
   authorized_ip_ranges       = var.authorized_ip_ranges
+  private_cluster_enabled    = var.aks_private_cluster
+  local_accounts_enabled     = var.aks_local_accounts_enabled
+  entra_rbac_enabled         = var.aks_entra_rbac_enabled
   system_pool                = local.sizing[var.sizing].system
   apps_pool                  = local.sizing[var.sizing].apps
   ai_pool                    = local.sizing[var.sizing].ai
