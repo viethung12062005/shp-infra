@@ -2,12 +2,12 @@ locals {
   name_prefix = "shp-${var.environment}"
   is_prod     = var.environment == "prod"
 
-  tags = {
+  tags = merge(var.extra_tags, {
     "shp-env"    = var.environment
     "created-at" = var.created_at
     "ttl-hours"  = tostring(var.ttl_hours)
     "managed-by" = "terraform"
-  }
+  })
 
   sizing = {
     small = {

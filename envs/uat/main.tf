@@ -17,6 +17,7 @@ module "environment" {
   created_at           = var.created_at
   ttl_hours            = var.ttl_hours
   enable_ai_pool       = var.enable_ai_pool
+  extra_tags           = var.extra_tags
   enable_malware_scan  = var.enable_malware_scan
   enable_ai_workload   = var.enable_ai_workload
   kubeconfig_path      = var.kubeconfig_path
