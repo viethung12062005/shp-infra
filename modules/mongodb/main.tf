@@ -51,7 +51,7 @@ module "private_endpoint" {
 }
 
 resource "azurerm_mongo_cluster_user" "service" {
-  for_each = var.service_users
+  for_each = var.create_service_users ? var.service_users : {}
 
   mongo_cluster_id       = azurerm_mongo_cluster.this.id
   object_id              = each.value.object_id

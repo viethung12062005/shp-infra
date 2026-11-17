@@ -12,6 +12,7 @@ output "servicebus_endpoint" { value = module.servicebus.endpoint }
 output "docs_storage_account" { value = module.storage.docs_account_name }
 output "malware_scan_results_queue" { value = module.servicebus.queue_names["malware-scan-results"] }
 output "malware_scan_event_subscription_id" { value = module.defender_storage.event_subscription_id }
+output "kb_container_name" { value = module.storage.kb_container_name }
 output "audit_storage_account" { value = module.storage.audit_account_name }
 output "search_name" { value = module.search.name }
 output "grafana_endpoint" { value = module.observability.grafana_endpoint }
@@ -88,6 +89,29 @@ output "keycloak_values" {
       name       = module.keyvault.name
       tenantId   = var.tenant_id
       secretKeys = module.keycloak_infra.key_vault_secret_names
+    }
+  }
+}
+
+output "data_access" {
+  description = <<-EOT
+    service -> what that service may use, derived from the same locals that feed the role assignments and database
+    users (IAC-20). PostgreSQL is listed for scheduling only: the database role itself is created after apply
+    (modules/postgres/README.md). Used by tests/data-access.tftest.hcl; contains no secrets.
+  EOT
+  value = {
+    for svc in local.services : svc => {
+      postgres_databases = svc == "scheduling" ? ["scheduling"] : []
+      mongo_databases    = lookup(local.mongo_databases, svc, [])
+      redis              = contains(local.redis_clients, svc)
+      blob_documents     = contains(local.document_writers, svc)
+      blob_kb            = contains(local.kb_readers, svc)
+      blob_mlops         = contains(local.ml_users, svc)
+      blob_audit         = contains(local.audit_writers, svc)
+      search             = contains(local.search_contributors, svc)
+      key_vault_secrets  = contains(local.key_vault_readers, svc)
+      servicebus_send    = true
+      servicebus_receive = contains(local.event_consumers, svc)
     }
   }
 }

@@ -80,7 +80,8 @@ variable "ai_pool" {
     error_message = "ai_pool.min_count must be >= 0 and ai_pool.max_count must be >= ai_pool.min_count."
   }
   validation {
-    condition     = var.ai_pool.gpu_driver == null || contains(["Install", "None"], var.ai_pool.gpu_driver)
+    # Terraform does not short-circuit ||, and contains() rejects null, so a plan failed whenever gpu_driver was unset.
+    condition     = var.ai_pool.gpu_driver == null ? true : contains(["Install", "None"], var.ai_pool.gpu_driver)
     error_message = "ai_pool.gpu_driver must be null, \"Install\" or \"None\"."
   }
 }

@@ -74,8 +74,19 @@ module "private_endpoint" {
 }
 
 # ---- containers
+# Azure container names need 3-63 characters, so the logical container `kb` (design 05 and 06) is created as
+# `knowledge-base`; the ai service reads its container name from the kb_container setting (see the kb_container output).
+locals {
+  docs_container_names = {
+    documents  = "documents"
+    quarantine = "quarantine"
+    kb         = "knowledge-base"
+    mlops      = "mlops"
+  }
+}
+
 resource "azurerm_storage_container" "docs" {
-  for_each = var.create_containers ? toset(["documents", "quarantine", "kb", "mlops"]) : toset([])
+  for_each = var.create_containers ? local.docs_container_names : {}
 
   name                  = each.value
   storage_account_id    = azurerm_storage_account.this["docs"].id

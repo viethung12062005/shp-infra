@@ -69,6 +69,17 @@ locals {
     ml           = ["ml"]
   }
 
+  # Who may use each non-Mongo store. These maps are passed to the modules below and also feed the data_access output,
+  # so the isolation table and its test (tests/data-access.tftest.hcl) read the same source as the role assignments.
+  redis_clients         = ["gateway", "scheduling"]
+  kb_readers            = ["ai"]
+  document_writers      = ["document"]
+  ml_users              = ["ml"]
+  audit_writers         = ["audit"]
+  search_contributors   = ["ai"]
+  key_vault_readers     = ["ai"]
+  malware_queue_readers = ["document"]
+
   # Services that have a Service Bus subscription (matches the default keys of the servicebus module)
   event_consumers = ["notification", "ml", "clinical", "scheduling", "document", "ai", "audit"]
 }
@@ -117,7 +128,7 @@ module "keyvault" {
   private_dns_zone_id         = module.network.private_dns_zone_ids["privatelink.vaultcore.azure.net"]
 
   # The ai pod reads the DeepSeek/Gemini keys through the Secrets Store CSI driver with its workload identity.
-  secret_reader_principal_ids = { ai = module.identities.principal_ids["ai"] }
+  secret_reader_principal_ids = { for svc in local.key_vault_readers : svc => module.identities.principal_ids[svc] }
   create_role_assignments     = var.create_role_assignments
 }
 
@@ -257,10 +268,7 @@ module "redis" {
   sku_name                    = local.data.redis_sku
   high_availability_enabled   = local.data.redis_ha
 
-  client_principal_ids = {
-    gateway    = module.identities.principal_ids["gateway"]
-    scheduling = module.identities.principal_ids["scheduling"]
-  }
+  client_principal_ids = { for svc in local.redis_clients : svc => module.identities.principal_ids[svc] }
 }
 
 module "servicebus" {
@@ -286,7 +294,7 @@ module "servicebus" {
     }
   }
   queue_receiver_principal_ids = {
-    malware-scan-results = module.identities.principal_ids["document"]
+    malware-scan-results = module.identities.principal_ids[one(local.malware_queue_readers)]
   }
 }
 
@@ -303,10 +311,10 @@ module "storage" {
   audit_retention_days        = local.is_prod ? 3650 : 1
   audit_retention_locked      = local.is_prod
 
-  document_writer_principal_ids = { document = module.identities.principal_ids["document"] }
-  kb_reader_principal_ids       = { ai = module.identities.principal_ids["ai"] }
-  ml_principal_ids              = { ml = module.identities.principal_ids["ml"] }
-  audit_writer_principal_ids    = { audit = module.identities.principal_ids["audit"] }
+  document_writer_principal_ids = { for svc in local.document_writers : svc => module.identities.principal_ids[svc] }
+  kb_reader_principal_ids       = { for svc in local.kb_readers : svc => module.identities.principal_ids[svc] }
+  ml_principal_ids              = { for svc in local.ml_users : svc => module.identities.principal_ids[svc] }
+  audit_writer_principal_ids    = { for svc in local.audit_writers : svc => module.identities.principal_ids[svc] }
   create_role_assignments       = var.create_role_assignments
   create_containers             = var.create_containers
 }
@@ -336,6 +344,6 @@ module "search" {
   sku                         = local.data.search_sku
   replica_count               = local.data.search_replicas
 
-  index_contributor_principal_ids = { ai = module.identities.principal_ids["ai"] }
+  index_contributor_principal_ids = { for svc in local.search_contributors : svc => module.identities.principal_ids[svc] }
   create_role_assignments         = var.create_role_assignments
 }
