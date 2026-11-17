@@ -95,8 +95,9 @@ module "network" {
   tags                = local.tags
   address_space       = var.address_space
 
-  # Private DNS zones accept at most 15 tags; keep the ones a tag policy requires plus shp-env.
-  private_dns_zone_tags = { for k, v in local.tags : k => v if contains(["shp-env", "CreatedBy", "Description", "ServiceOwner"], k) }
+  # Private DNS zones accept at most 15 tags. A tag policy can also add about ten inherited tags, so keep every
+  # extra tag (they include the inherited ones, which avoids drift) but only shp-env of the shp-* tags.
+  private_dns_zone_tags = { for k, v in local.tags : k => v if !contains(["Environment", "Region", "created-at", "ttl-hours", "managed-by"], k) }
 }
 
 module "monitoring" {
