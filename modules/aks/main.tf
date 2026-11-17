@@ -14,6 +14,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   private_cluster_enabled           = var.private_cluster_enabled
   role_based_access_control_enabled = true
   image_cleaner_enabled             = true
+  image_cleaner_interval_hours      = 48 # AKS rejects 0; the allowed range is 24 to 2160
   automatic_upgrade_channel         = "patch"
   node_os_upgrade_channel           = "NodeImage"
 
