@@ -1,11 +1,3 @@
-resource "azurerm_virtual_network" "this" {
-  name                = "vnet-${var.name_prefix}"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  address_space       = [var.address_space]
-  tags                = var.tags
-}
-
 locals {
   # The /16 is split into: AKS nodes (/20), private endpoints (/24), delegated PostgreSQL (/24)
   subnets = {
@@ -15,41 +7,60 @@ locals {
   }
 }
 
-resource "azurerm_subnet" "aks" {
-  name                 = "snet-aks"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [local.subnets.aks]
+# A subscription policy can deny a subnet that is created without a network security group, and azurerm_subnet cannot
+# set one at creation. So the subnets are declared inline in the virtual network, each with its own NSG (default rules).
+resource "azurerm_network_security_group" "subnet" {
+  for_each            = local.subnets
+  name                = "nsg-${var.name_prefix}-${each.key}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
 }
 
-resource "azurerm_subnet" "private_endpoints" {
-  name                              = "snet-private-endpoints"
-  resource_group_name               = var.resource_group_name
-  virtual_network_name              = azurerm_virtual_network.this.name
-  address_prefixes                  = [local.subnets.private-endpoints]
-  private_endpoint_network_policies = "Enabled"
-}
+resource "azurerm_virtual_network" "this" {
+  name                = "vnet-${var.name_prefix}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  address_space       = [var.address_space]
+  tags                = var.tags
 
-resource "azurerm_subnet" "postgres" {
-  name                 = "snet-postgres"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [local.subnets.postgres]
+  subnet {
+    name             = "snet-aks"
+    address_prefixes = [local.subnets.aks]
+    security_group   = azurerm_network_security_group.subnet["aks"].id
+  }
 
-  delegation {
-    name = "postgres-flexible"
-    service_delegation {
-      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+  subnet {
+    name                              = "snet-private-endpoints"
+    address_prefixes                  = [local.subnets.private-endpoints]
+    security_group                    = azurerm_network_security_group.subnet["private-endpoints"].id
+    private_endpoint_network_policies = "Enabled"
+  }
+
+  subnet {
+    name             = "snet-postgres"
+    address_prefixes = [local.subnets.postgres]
+    security_group   = azurerm_network_security_group.subnet["postgres"].id
+
+    delegation {
+      name = "postgres-flexible"
+      service_delegation {
+        name    = "Microsoft.DBforPostgreSQL/flexibleServers"
+        actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+      }
     }
   }
+}
+
+locals {
+  subnet_ids = { for s in azurerm_virtual_network.this.subnet : s.name => s.id }
 }
 
 resource "azurerm_private_dns_zone" "this" {
   for_each            = toset(var.private_dns_zones)
   name                = each.value
   resource_group_name = var.resource_group_name
-  tags                = var.tags
+  tags                = coalesce(var.private_dns_zone_tags, var.tags)
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "this" {
