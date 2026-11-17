@@ -15,8 +15,9 @@ variable "apps_namespace" {
 }
 
 variable "grafana_major_version" {
-  type    = string
-  default = "11"
+  description = "Azure Managed Grafana major version; the Standard SKU accepts 12 or 13."
+  type        = string
+  default     = "12"
 }
 
 variable "grafana_public_network_access" {
