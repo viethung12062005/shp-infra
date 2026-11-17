@@ -89,8 +89,12 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   node_labels           = { "shp/pool" = "apps" }
   tags                  = var.tags
 
-  upgrade_settings {
-    max_surge = "33%"
+  # Azure rejects max_surge on a Spot pool ("Spot pools do not support max_surge"); a Spot pool has no surge upgrade.
+  dynamic "upgrade_settings" {
+    for_each = var.apps_pool.spot ? [] : [1]
+    content {
+      max_surge = "33%"
+    }
   }
 }
 
