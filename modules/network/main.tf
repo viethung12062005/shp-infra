@@ -69,5 +69,5 @@ resource "azurerm_private_dns_zone_virtual_network_link" "this" {
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = each.value.name
   virtual_network_id    = azurerm_virtual_network.this.id
-  tags                  = var.tags
+  tags                  = coalesce(var.private_dns_zone_tags, var.tags)
 }
