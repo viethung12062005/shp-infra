@@ -18,6 +18,7 @@ module "environment" {
   ttl_hours                  = var.ttl_hours
   enable_ai_pool             = var.enable_ai_pool
   extra_tags                 = var.extra_tags
+  aks_zones                  = var.aks_zones
   aks_private_cluster        = var.aks_private_cluster
   aks_local_accounts_enabled = var.aks_local_accounts_enabled
   aks_entra_rbac_enabled     = var.aks_entra_rbac_enabled

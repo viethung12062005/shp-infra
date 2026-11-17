@@ -126,3 +126,9 @@ variable "aks_entra_rbac_enabled" {
   type        = bool
   default     = true
 }
+
+variable "aks_zones" {
+  description = "Availability zones for the AKS node pools; [] where the subscription has none. See modules/environment."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}

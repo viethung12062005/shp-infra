@@ -1,3 +1,8 @@
+locals {
+  # A subscription may have no availability zones for the chosen VM size and region; an empty list means no zones.
+  zones = length(var.zones) == 0 ? null : var.zones
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = "aks-${var.name_prefix}"
   resource_group_name = var.resource_group_name
@@ -34,7 +39,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     name                         = "system"
     vm_size                      = var.system_pool.vm_size
     vnet_subnet_id               = var.subnet_id
-    zones                        = var.zones
+    zones                        = local.zones
     auto_scaling_enabled         = true
     min_count                    = var.system_pool.min_count
     max_count                    = var.system_pool.max_count
@@ -87,7 +92,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
   vm_size               = var.apps_pool.vm_size
   vnet_subnet_id        = var.subnet_id
-  zones                 = var.zones
+  zones                 = local.zones
   auto_scaling_enabled  = true
   min_count             = var.apps_pool.min_count
   max_count             = var.apps_pool.max_count
@@ -113,7 +118,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai" {
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
   vm_size               = var.ai_pool.vm_size
   vnet_subnet_id        = var.subnet_id
-  zones                 = var.zones
+  zones                 = local.zones
   auto_scaling_enabled  = true
   min_count             = var.ai_pool.min_count
   max_count             = var.ai_pool.max_count
