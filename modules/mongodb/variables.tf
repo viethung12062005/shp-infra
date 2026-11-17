@@ -37,3 +37,13 @@ variable "service_users" {
     databases = list(string)
   }))
 }
+
+variable "create_service_users" {
+  description = <<-EOT
+    Create one Entra user per service through azurerm_mongo_cluster_user. Off by default: azurerm 4.x accepts only the
+    role "root" for these users (plan error: "expected role.0.name to be one of [root]"), which would give every service
+    full access to the cluster. Per-database readWrite users are created in the data plane after apply instead.
+  EOT
+  type        = bool
+  default     = false
+}

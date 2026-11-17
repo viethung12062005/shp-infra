@@ -43,6 +43,11 @@ output "workload_identity_names" {
   value       = module.environment.workload_identity_names
 }
 
+output "postgres_name" {
+  description = "scheduling PostgreSQL server name."
+  value       = module.environment.postgres_name
+}
+
 output "postgres_fqdn" {
   description = "PostgreSQL host, used in SPRING_DATASOURCE_URL of scheduling (shp-gitops)."
   value       = module.environment.postgres_fqdn
@@ -51,6 +56,41 @@ output "postgres_fqdn" {
 output "keycloak_values" {
   description = "Non-secret Keycloak values for shp-gitops envs/prod (IAM-01): IAM database host, workload identity client id, Key Vault secret names."
   value       = module.environment.keycloak_values
+}
+
+output "mongo_cluster_name" {
+  description = "Cosmos DB for MongoDB cluster name (per-service users are created in the data plane after apply)."
+  value       = module.environment.mongo_cluster_name
+}
+
+output "redis_name" {
+  description = "Azure Managed Redis name (gateway and scheduling)."
+  value       = module.environment.redis_name
+}
+
+output "servicebus_endpoint" {
+  description = "Service Bus namespace endpoint for the services (Entra ID)."
+  value       = module.environment.servicebus_endpoint
+}
+
+output "docs_storage_account" {
+  description = "Documents storage account (document, ai, ml)."
+  value       = module.environment.docs_storage_account
+}
+
+output "audit_storage_account" {
+  description = "WORM audit storage account (audit)."
+  value       = module.environment.audit_storage_account
+}
+
+output "kb_container_name" {
+  description = "Real name of the knowledge-base container; set as the ai service kb_container setting in shp-gitops."
+  value       = module.environment.kb_container_name
+}
+
+output "search_name" {
+  description = "AI Search service name (ai)."
+  value       = module.environment.search_name
 }
 
 output "grafana_endpoint" {
