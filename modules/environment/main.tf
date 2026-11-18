@@ -126,11 +126,12 @@ module "keyvault" {
 }
 
 module "aks" {
-  source                     = "../aks"
-  name_prefix                = local.name_prefix
-  resource_group_name        = azurerm_resource_group.this.name
-  location                   = var.location
-  tags                       = local.tags
+  source              = "../aks"
+  name_prefix         = local.name_prefix
+  resource_group_name = azurerm_resource_group.this.name
+  location            = var.location
+  # AKS copies the cluster tags to its private DNS zone, which accepts at most 15 tags.
+  tags                       = { for k, v in local.tags : k => v if !contains(["created-at", "ttl-hours", "managed-by"], k) }
   tenant_id                  = var.tenant_id
   kubernetes_version         = var.kubernetes_version
   sku_tier                   = local.is_prod ? "Standard" : "Free"
