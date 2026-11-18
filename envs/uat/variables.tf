@@ -132,3 +132,21 @@ variable "aks_zones" {
   type        = list(string)
   default     = ["1", "2", "3"]
 }
+
+variable "aks_system_pool_critical_addons_only" {
+  description = "Taint the AKS system pool with CriticalAddonsOnly (default). Off only in a test environment."
+  type        = bool
+  default     = true
+}
+
+variable "storage_shared_key_enabled" {
+  description = "Allow shared-key access on the storage accounts (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}
+
+variable "redis_access_keys_enabled" {
+  description = "Allow access-key authentication on Redis (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}

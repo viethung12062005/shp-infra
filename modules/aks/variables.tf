@@ -115,3 +115,9 @@ variable "entra_rbac_enabled" {
   type        = bool
   default     = true
 }
+
+variable "system_pool_critical_addons_only" {
+  description = "Taint the system pool with CriticalAddonsOnly. Turn off only in a test environment that must run command pods (az aks command invoke) on a small cluster."
+  type        = bool
+  default     = true
+}

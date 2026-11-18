@@ -20,3 +20,9 @@ variable "client_principal_ids" {
   description = "Identities allowed to read/write Redis through Entra ID (gateway: rate-limit counters; scheduling: free-slot cache)."
   type        = map(string)
 }
+
+variable "access_keys_authentication_enabled" {
+  description = "Allow access-key authentication. Default off: Entra ID only. The gateway client currently authenticates with a password, so a test environment turns this on."
+  type        = bool
+  default     = false
+}

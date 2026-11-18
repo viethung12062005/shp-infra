@@ -43,7 +43,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     auto_scaling_enabled         = true
     min_count                    = var.system_pool.min_count
     max_count                    = var.system_pool.max_count
-    only_critical_addons_enabled = true
+    only_critical_addons_enabled = var.system_pool_critical_addons_only
     os_disk_size_gb              = 64
     upgrade_settings {
       max_surge = "33%"

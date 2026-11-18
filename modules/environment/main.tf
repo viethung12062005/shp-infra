@@ -131,23 +131,24 @@ module "aks" {
   resource_group_name = azurerm_resource_group.this.name
   location            = var.location
   # AKS copies the cluster tags to its private DNS zone, which accepts at most 15 tags.
-  tags                       = { for k, v in local.tags : k => v if !contains(["created-at", "ttl-hours", "managed-by"], k) }
-  tenant_id                  = var.tenant_id
-  kubernetes_version         = var.kubernetes_version
-  sku_tier                   = local.is_prod ? "Standard" : "Free"
-  subnet_id                  = module.network.aks_subnet_id
-  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
-  authorized_ip_ranges       = var.authorized_ip_ranges
-  zones                      = var.aks_zones
-  private_cluster_enabled    = var.aks_private_cluster
-  local_accounts_enabled     = var.aks_local_accounts_enabled
-  entra_rbac_enabled         = var.aks_entra_rbac_enabled
-  system_pool                = local.sizing[var.sizing].system
-  apps_pool                  = local.sizing[var.sizing].apps
-  ai_pool                    = local.sizing[var.sizing].ai
-  enable_ai_pool             = var.enable_ai_pool
-  acr_id                     = var.acr_id
-  create_role_assignments    = var.create_role_assignments
+  tags                             = { for k, v in local.tags : k => v if !contains(["created-at", "ttl-hours", "managed-by"], k) }
+  system_pool_critical_addons_only = var.aks_system_pool_critical_addons_only
+  tenant_id                        = var.tenant_id
+  kubernetes_version               = var.kubernetes_version
+  sku_tier                         = local.is_prod ? "Standard" : "Free"
+  subnet_id                        = module.network.aks_subnet_id
+  log_analytics_workspace_id       = module.monitoring.log_analytics_workspace_id
+  authorized_ip_ranges             = var.authorized_ip_ranges
+  zones                            = var.aks_zones
+  private_cluster_enabled          = var.aks_private_cluster
+  local_accounts_enabled           = var.aks_local_accounts_enabled
+  entra_rbac_enabled               = var.aks_entra_rbac_enabled
+  system_pool                      = local.sizing[var.sizing].system
+  apps_pool                        = local.sizing[var.sizing].apps
+  ai_pool                          = local.sizing[var.sizing].ai
+  enable_ai_pool                   = var.enable_ai_pool
+  acr_id                           = var.acr_id
+  create_role_assignments          = var.create_role_assignments
 }
 
 module "observability" {
@@ -240,6 +241,8 @@ module "redis" {
   sku_name                    = local.data.redis_sku
   high_availability_enabled   = local.data.redis_ha
 
+  access_keys_authentication_enabled = var.redis_access_keys_enabled
+
   client_principal_ids = {
     gateway    = module.identities.principal_ids["gateway"]
     scheduling = module.identities.principal_ids["scheduling"]
@@ -286,6 +289,7 @@ module "storage" {
   replication_type            = local.data.replication
   audit_retention_days        = local.is_prod ? 3650 : 1
   audit_retention_locked      = local.is_prod
+  shared_access_key_enabled   = var.storage_shared_key_enabled
 
   document_writer_principal_ids = { document = module.identities.principal_ids["document"] }
   kb_reader_principal_ids       = { ai = module.identities.principal_ids["ai"] }
