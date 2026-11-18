@@ -24,6 +24,13 @@ resource "azurerm_virtual_network" "this" {
   address_space       = [var.address_space]
   tags                = var.tags
 
+  # The subnets are inline (see above). The provider re-plans the whole inline set as changed after the first apply
+  # even though no value differs, which makes every subnet id "known after apply" and forces a replacement of the
+  # PostgreSQL servers. The subnets are fixed by the address plan, so ignore the set after creation.
+  lifecycle {
+    ignore_changes = [subnet]
+  }
+
   subnet {
     name             = "snet-aks"
     address_prefixes = [local.subnets.aks]

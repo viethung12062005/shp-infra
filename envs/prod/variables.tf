@@ -150,3 +150,19 @@ variable "redis_access_keys_enabled" {
   type        = bool
   default     = false
 }
+
+variable "entra_admin_name" {
+  description = "Principal name of the PostgreSQL Entra administrator: the managed identity that runs Terraform, or the user's UPN when a person runs it."
+  type        = string
+  default     = "id-shp-infra-prod"
+}
+
+variable "entra_admin_type" {
+  description = "ServicePrincipal (managed identity, the CI default) or User (a person running Terraform). It must match the object id of the caller."
+  type        = string
+  default     = "ServicePrincipal"
+  validation {
+    condition     = contains(["ServicePrincipal", "User", "Group"], var.entra_admin_type)
+    error_message = "entra_admin_type must be ServicePrincipal, User or Group."
+  }
+}

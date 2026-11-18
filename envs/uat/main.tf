@@ -33,8 +33,8 @@ module "environment" {
   # The identity that runs Terraform is the Entra administrator of PostgreSQL (the server has no password)
   entra_admin = {
     object_id = data.azurerm_client_config.current.object_id
-    name      = "id-shp-infra-uat"
-    type      = "ServicePrincipal"
+    name      = var.entra_admin_name
+    type      = var.entra_admin_type
   }
 
   messaging_sku = var.messaging_sku
