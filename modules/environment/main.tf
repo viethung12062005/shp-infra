@@ -222,11 +222,12 @@ module "mongodb" {
   storage_size_in_gb          = local.data.mongo_storage_gb
   high_availability_mode      = local.data.mongo_ha
 
+  # Entra users on the cluster follow the same switch as the other identity grants (a sandbox cannot create them).
   service_users = {
     for svc, dbs in local.mongo_databases : svc => {
       object_id = module.identities.principal_ids[svc]
       databases = dbs
-    }
+    } if var.create_role_assignments
   }
 }
 
