@@ -17,7 +17,7 @@ resource "azurerm_managed_redis" "this" {
   public_network_access     = "Disabled"
 
   default_database {
-    access_keys_authentication_enabled = false
+    access_keys_authentication_enabled = var.access_keys_authentication_enabled
     client_protocol                    = "Encrypted"
     clustering_policy                  = "EnterpriseCluster"
     eviction_policy                    = "VolatileLRU"

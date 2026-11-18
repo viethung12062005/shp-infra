@@ -8,25 +8,33 @@ data "azurerm_container_registry" "acr" {
 module "environment" {
   source = "../../modules/environment"
 
-  environment          = "uat"
-  location             = var.location
-  tenant_id            = data.azurerm_client_config.current.tenant_id
-  acr_id               = data.azurerm_container_registry.acr.id
-  sizing               = var.sizing
-  address_space        = "10.60.0.0/16"
-  created_at           = var.created_at
-  ttl_hours            = var.ttl_hours
-  enable_ai_pool       = var.enable_ai_pool
-  enable_malware_scan  = var.enable_malware_scan
-  enable_ai_workload   = var.enable_ai_workload
-  kubeconfig_path      = var.kubeconfig_path
-  authorized_ip_ranges = var.authorized_ip_ranges
+  environment                          = "uat"
+  location                             = var.location
+  tenant_id                            = data.azurerm_client_config.current.tenant_id
+  acr_id                               = data.azurerm_container_registry.acr.id
+  sizing                               = var.sizing
+  address_space                        = "10.60.0.0/16"
+  created_at                           = var.created_at
+  ttl_hours                            = var.ttl_hours
+  enable_ai_pool                       = var.enable_ai_pool
+  extra_tags                           = var.extra_tags
+  aks_zones                            = var.aks_zones
+  aks_system_pool_critical_addons_only = var.aks_system_pool_critical_addons_only
+  storage_shared_key_enabled           = var.storage_shared_key_enabled
+  redis_access_keys_enabled            = var.redis_access_keys_enabled
+  aks_private_cluster                  = var.aks_private_cluster
+  aks_local_accounts_enabled           = var.aks_local_accounts_enabled
+  aks_entra_rbac_enabled               = var.aks_entra_rbac_enabled
+  enable_malware_scan                  = var.enable_malware_scan
+  enable_ai_workload                   = var.enable_ai_workload
+  kubeconfig_path                      = var.kubeconfig_path
+  authorized_ip_ranges                 = var.authorized_ip_ranges
 
   # The identity that runs Terraform is the Entra administrator of PostgreSQL (the server has no password)
   entra_admin = {
     object_id = data.azurerm_client_config.current.object_id
-    name      = "id-shp-infra-uat"
-    type      = "ServicePrincipal"
+    name      = var.entra_admin_name
+    type      = var.entra_admin_type
   }
 
   messaging_sku = var.messaging_sku
