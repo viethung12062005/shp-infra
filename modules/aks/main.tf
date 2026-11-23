@@ -1,3 +1,8 @@
+locals {
+  # A subscription may have no availability zones for the chosen VM size and region; an empty list means no zones.
+  zones = length(var.zones) == 0 ? null : var.zones
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = "aks-${var.name_prefix}"
   resource_group_name = var.resource_group_name
@@ -10,15 +15,20 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Identity and security
   oidc_issuer_enabled               = true
   workload_identity_enabled         = true
-  local_account_disabled            = true
+  local_account_disabled            = !var.local_accounts_enabled
+  private_cluster_enabled           = var.private_cluster_enabled
   role_based_access_control_enabled = true
   image_cleaner_enabled             = true
+  image_cleaner_interval_hours      = 48 # AKS rejects 0; the allowed range is 24 to 2160
   automatic_upgrade_channel         = "patch"
   node_os_upgrade_channel           = "NodeImage"
 
-  azure_active_directory_role_based_access_control {
-    azure_rbac_enabled = true
-    tenant_id          = var.tenant_id
+  dynamic "azure_active_directory_role_based_access_control" {
+    for_each = var.entra_rbac_enabled ? [1] : []
+    content {
+      azure_rbac_enabled = true
+      tenant_id          = var.tenant_id
+    }
   }
 
   identity {
@@ -29,11 +39,11 @@ resource "azurerm_kubernetes_cluster" "this" {
     name                         = "system"
     vm_size                      = var.system_pool.vm_size
     vnet_subnet_id               = var.subnet_id
-    zones                        = var.zones
+    zones                        = local.zones
     auto_scaling_enabled         = true
     min_count                    = var.system_pool.min_count
     max_count                    = var.system_pool.max_count
-    only_critical_addons_enabled = true
+    only_critical_addons_enabled = var.system_pool_critical_addons_only
     os_disk_size_gb              = 64
     upgrade_settings {
       max_surge = "33%"
@@ -64,8 +74,12 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Managed Prometheus: enables the metrics agent; scrape rules and the destination live in the observability module
   monitor_metrics {}
 
-  api_server_access_profile {
-    authorized_ip_ranges = var.authorized_ip_ranges
+  # A private cluster has no public endpoint, so there is nothing to restrict
+  dynamic "api_server_access_profile" {
+    for_each = var.private_cluster_enabled ? [] : [1]
+    content {
+      authorized_ip_ranges = var.authorized_ip_ranges
+    }
   }
 
   lifecycle {
@@ -78,7 +92,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
   vm_size               = var.apps_pool.vm_size
   vnet_subnet_id        = var.subnet_id
-  zones                 = var.zones
+  zones                 = local.zones
   auto_scaling_enabled  = true
   min_count             = var.apps_pool.min_count
   max_count             = var.apps_pool.max_count
@@ -89,8 +103,12 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   node_labels           = { "shp/pool" = "apps" }
   tags                  = var.tags
 
-  upgrade_settings {
-    max_surge = "33%"
+  # Azure rejects max_surge on a Spot pool ("Spot pools do not support max_surge"); a Spot pool has no surge upgrade.
+  dynamic "upgrade_settings" {
+    for_each = var.apps_pool.spot ? [] : [1]
+    content {
+      max_surge = "33%"
+    }
   }
 }
 
@@ -100,7 +118,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai" {
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
   vm_size               = var.ai_pool.vm_size
   vnet_subnet_id        = var.subnet_id
-  zones                 = var.zones
+  zones                 = local.zones
   auto_scaling_enabled  = true
   min_count             = var.ai_pool.min_count
   max_count             = var.ai_pool.max_count

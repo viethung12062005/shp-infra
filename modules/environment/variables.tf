@@ -134,6 +134,54 @@ variable "create_tag_policy" {
   default     = true
 }
 
+variable "extra_tags" {
+  description = "Extra tags added to every resource group and resource, for subscriptions whose tag policy requires more than the shp-* tags (for example Environment, Region, CreatedBy, Description and ServiceOwner). Empty by default."
+  type        = map(string)
+  default     = {}
+}
+
+variable "aks_private_cluster" {
+  description = "Make the AKS API server private. Needed where a subscription policy requires private clusters."
+  type        = bool
+  default     = false
+}
+
+variable "aks_local_accounts_enabled" {
+  description = "Keep AKS local admin accounts (default off, Entra ID only). For subscriptions where role assignments are blocked."
+  type        = bool
+  default     = false
+}
+
+variable "aks_entra_rbac_enabled" {
+  description = "Entra ID integration with Azure RBAC for Kubernetes (default on). Turn off only together with aks_local_accounts_enabled."
+  type        = bool
+  default     = true
+}
+
+variable "aks_zones" {
+  description = "Availability zones for the AKS node pools. Use [] where the subscription has no zones for the chosen VM size and region."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
+variable "aks_system_pool_critical_addons_only" {
+  description = "Taint the AKS system pool with CriticalAddonsOnly (default). Off only in a test environment."
+  type        = bool
+  default     = true
+}
+
+variable "storage_shared_key_enabled" {
+  description = "Allow shared-key access on the storage accounts (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}
+
+variable "redis_access_keys_enabled" {
+  description = "Allow access-key authentication on Redis (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}
+
 variable "keycloak_db_auth" {
   description = "How Keycloak signs in to its PostgreSQL server: password (generated, kept only in Key Vault) or entra (workload identity). Settled in IAM-01."
   type        = string

@@ -102,3 +102,67 @@ variable "create_tag_policy" {
   type        = bool
   default     = true
 }
+
+variable "extra_tags" {
+  description = "Extra tags required by the subscription's tag policy; see modules/environment."
+  type        = map(string)
+  default     = {}
+}
+
+variable "aks_private_cluster" {
+  description = "Make the AKS API server private. Needed where a subscription policy requires private clusters."
+  type        = bool
+  default     = false
+}
+
+variable "aks_local_accounts_enabled" {
+  description = "Keep AKS local admin accounts (default off, Entra ID only). For subscriptions where role assignments are blocked."
+  type        = bool
+  default     = false
+}
+
+variable "aks_entra_rbac_enabled" {
+  description = "Entra ID integration with Azure RBAC for Kubernetes (default on). Turn off only together with aks_local_accounts_enabled."
+  type        = bool
+  default     = true
+}
+
+variable "aks_zones" {
+  description = "Availability zones for the AKS node pools; [] where the subscription has none. See modules/environment."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
+variable "aks_system_pool_critical_addons_only" {
+  description = "Taint the AKS system pool with CriticalAddonsOnly (default). Off only in a test environment."
+  type        = bool
+  default     = true
+}
+
+variable "storage_shared_key_enabled" {
+  description = "Allow shared-key access on the storage accounts (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}
+
+variable "redis_access_keys_enabled" {
+  description = "Allow access-key authentication on Redis (default off, Entra ID only)."
+  type        = bool
+  default     = false
+}
+
+variable "entra_admin_name" {
+  description = "Principal name of the PostgreSQL Entra administrator: the managed identity that runs Terraform, or the user's UPN when a person runs it."
+  type        = string
+  default     = "id-shp-infra-prod"
+}
+
+variable "entra_admin_type" {
+  description = "ServicePrincipal (managed identity, the CI default) or User (a person running Terraform). It must match the object id of the caller."
+  type        = string
+  default     = "ServicePrincipal"
+  validation {
+    condition     = contains(["ServicePrincipal", "User", "Group"], var.entra_admin_type)
+    error_message = "entra_admin_type must be ServicePrincipal, User or Group."
+  }
+}

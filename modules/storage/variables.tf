@@ -67,3 +67,9 @@ variable "create_containers" {
   type        = bool
   default     = true
 }
+
+variable "shared_access_key_enabled" {
+  description = "Allow shared-key (connection string) access. Default off: Entra ID only. Turn on only where a service cannot use a managed identity yet (document reads AZURE_STORAGE_CONNECTION_STRING)."
+  type        = bool
+  default     = false
+}
