@@ -181,3 +181,15 @@ variable "redis_access_keys_enabled" {
   type        = bool
   default     = false
 }
+
+variable "keycloak_db_auth" {
+  description = "How Keycloak signs in to its PostgreSQL server: password (generated, kept only in Key Vault) or entra (workload identity). Settled in IAM-01."
+  type        = string
+  default     = "password"
+}
+
+variable "create_key_vault_secrets" {
+  description = "Write the generated Keycloak secrets into Key Vault through an ARM deployment. Set false if the deploying identity cannot write vault secrets."
+  type        = bool
+  default     = true
+}

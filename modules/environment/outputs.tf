@@ -71,3 +71,23 @@ output "ai_service_values" {
     workloadIdentity = { clientId = module.identities.client_ids["ai"] }
   }
 }
+
+output "keycloak_values" {
+  description = "Non-secret values for shp-gitops (IAM-01): database, workload identity and Key Vault secret names for Keycloak. Secret values are never output."
+  value = {
+    namespace      = module.keycloak_infra.namespace
+    serviceAccount = module.keycloak_infra.service_account_name
+    database = {
+      host     = module.keycloak_infra.postgres_fqdn
+      name     = module.keycloak_infra.database_name
+      username = module.keycloak_infra.db_username
+      auth     = var.keycloak_db_auth
+    }
+    workloadIdentity = { clientId = module.keycloak_infra.identity_client_id }
+    keyVault = {
+      name       = module.keyvault.name
+      tenantId   = var.tenant_id
+      secretKeys = module.keycloak_infra.key_vault_secret_names
+    }
+  }
+}

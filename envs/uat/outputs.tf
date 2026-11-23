@@ -48,6 +48,11 @@ output "postgres_fqdn" {
   value       = module.environment.postgres_fqdn
 }
 
+output "keycloak_values" {
+  description = "Non-secret Keycloak values for shp-gitops envs/uat (IAM-01): IAM database host, workload identity client id, Key Vault secret names."
+  value       = module.environment.keycloak_values
+}
+
 output "grafana_endpoint" {
   value = module.environment.grafana_endpoint
 }
