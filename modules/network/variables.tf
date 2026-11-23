@@ -21,3 +21,9 @@ variable "private_dns_zones" {
     "privatelink.search.windows.net",
   ]
 }
+
+variable "private_dns_zone_tags" {
+  description = "Tags for the private DNS zones. Azure allows at most 15 tags on a zone, and a tag policy can inherit about ten from the subscription, so a small set may be needed. Defaults to tags."
+  type        = map(string)
+  default     = null
+}

@@ -98,3 +98,27 @@ variable "create_role_assignments" {
   type        = bool
   default     = true
 }
+
+variable "private_cluster_enabled" {
+  description = "Make the API server private (no public endpoint). A subscription policy can require this; reach the cluster with `az aks command invoke` or from inside the VNet. When true, authorized_ip_ranges is not used."
+  type        = bool
+  default     = false
+}
+
+variable "local_accounts_enabled" {
+  description = "Keep the cluster's local (certificate) admin accounts. Off by default (Entra ID only). Turn it on only where role assignments are blocked and the cluster would otherwise be unreachable."
+  type        = bool
+  default     = false
+}
+
+variable "entra_rbac_enabled" {
+  description = "Integrate the cluster with Entra ID and use Azure RBAC for Kubernetes. On by default. Turn it off only together with local_accounts_enabled where role assignments are blocked."
+  type        = bool
+  default     = true
+}
+
+variable "system_pool_critical_addons_only" {
+  description = "Taint the system pool with CriticalAddonsOnly. Turn off only in a test environment that must run command pods (az aks command invoke) on a small cluster."
+  type        = bool
+  default     = true
+}

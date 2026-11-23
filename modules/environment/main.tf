@@ -2,12 +2,12 @@ locals {
   name_prefix = "shp-${var.environment}"
   is_prod     = var.environment == "prod"
 
-  tags = {
+  tags = merge(var.extra_tags, {
     "shp-env"    = var.environment
     "created-at" = var.created_at
     "ttl-hours"  = tostring(var.ttl_hours)
     "managed-by" = "terraform"
-  }
+  })
 
   sizing = {
     small = {
@@ -105,6 +105,10 @@ module "network" {
   location            = var.location
   tags                = local.tags
   address_space       = var.address_space
+
+  # Private DNS zones accept at most 15 tags. A tag policy can also add about ten inherited tags, so keep every
+  # extra tag (they include the inherited ones, which avoids drift) but only shp-env of the shp-* tags (15 in all).
+  private_dns_zone_tags = { for k, v in local.tags : k => v if !contains(["created-at", "ttl-hours", "managed-by"], k) }
 }
 
 module "monitoring" {
@@ -133,23 +137,29 @@ module "keyvault" {
 }
 
 module "aks" {
-  source                     = "../aks"
-  name_prefix                = local.name_prefix
-  resource_group_name        = azurerm_resource_group.this.name
-  location                   = var.location
-  tags                       = local.tags
-  tenant_id                  = var.tenant_id
-  kubernetes_version         = var.kubernetes_version
-  sku_tier                   = local.is_prod ? "Standard" : "Free"
-  subnet_id                  = module.network.aks_subnet_id
-  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
-  authorized_ip_ranges       = var.authorized_ip_ranges
-  system_pool                = local.sizing[var.sizing].system
-  apps_pool                  = local.sizing[var.sizing].apps
-  ai_pool                    = local.sizing[var.sizing].ai
-  enable_ai_pool             = var.enable_ai_pool
-  acr_id                     = var.acr_id
-  create_role_assignments    = var.create_role_assignments
+  source              = "../aks"
+  name_prefix         = local.name_prefix
+  resource_group_name = azurerm_resource_group.this.name
+  location            = var.location
+  # AKS copies the cluster tags to its private DNS zone, which accepts at most 15 tags.
+  tags                             = { for k, v in local.tags : k => v if !contains(["created-at", "ttl-hours", "managed-by"], k) }
+  system_pool_critical_addons_only = var.aks_system_pool_critical_addons_only
+  tenant_id                        = var.tenant_id
+  kubernetes_version               = var.kubernetes_version
+  sku_tier                         = local.is_prod ? "Standard" : "Free"
+  subnet_id                        = module.network.aks_subnet_id
+  log_analytics_workspace_id       = module.monitoring.log_analytics_workspace_id
+  authorized_ip_ranges             = var.authorized_ip_ranges
+  zones                            = var.aks_zones
+  private_cluster_enabled          = var.aks_private_cluster
+  local_accounts_enabled           = var.aks_local_accounts_enabled
+  entra_rbac_enabled               = var.aks_entra_rbac_enabled
+  system_pool                      = local.sizing[var.sizing].system
+  apps_pool                        = local.sizing[var.sizing].apps
+  ai_pool                          = local.sizing[var.sizing].ai
+  enable_ai_pool                   = var.enable_ai_pool
+  acr_id                           = var.acr_id
+  create_role_assignments          = var.create_role_assignments
 }
 
 module "observability" {
@@ -249,11 +259,12 @@ module "mongodb" {
   storage_size_in_gb          = local.data.mongo_storage_gb
   high_availability_mode      = local.data.mongo_ha
 
+  # Entra users on the cluster follow the same switch as the other identity grants (a sandbox cannot create them).
   service_users = {
     for svc, dbs in local.mongo_databases : svc => {
       object_id = module.identities.principal_ids[svc]
       databases = dbs
-    }
+    } if var.create_role_assignments
   }
 }
 
@@ -267,6 +278,8 @@ module "redis" {
   private_dns_zone_id         = module.network.private_dns_zone_ids["privatelink.redis.azure.net"]
   sku_name                    = local.data.redis_sku
   high_availability_enabled   = local.data.redis_ha
+
+  access_keys_authentication_enabled = var.redis_access_keys_enabled
 
   client_principal_ids = { for svc in local.redis_clients : svc => module.identities.principal_ids[svc] }
 }
@@ -283,8 +296,9 @@ module "servicebus" {
   log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
 
   # Every service emits audit (E11), so all of them may send; only consumers with a subscription may receive
-  sender_principal_ids   = module.identities.principal_ids
-  receiver_principal_ids = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
+  create_role_assignments = var.create_role_assignments
+  sender_principal_ids    = module.identities.principal_ids
+  receiver_principal_ids  = { for svc in local.event_consumers : svc => module.identities.principal_ids[svc] }
 
   # Defender for Storage writes malware scan results here; the document service is the only consumer.
   queues = {
@@ -310,6 +324,7 @@ module "storage" {
   replication_type            = local.data.replication
   audit_retention_days        = local.is_prod ? 3650 : 1
   audit_retention_locked      = local.is_prod
+  shared_access_key_enabled   = var.storage_shared_key_enabled
 
   document_writer_principal_ids = { for svc in local.document_writers : svc => module.identities.principal_ids[svc] }
   kb_reader_principal_ids       = { for svc in local.kb_readers : svc => module.identities.principal_ids[svc] }
