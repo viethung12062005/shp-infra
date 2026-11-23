@@ -62,6 +62,28 @@ variable "databases" {
   default     = ["scheduling"]
 }
 
+variable "extensions" {
+  description = "Extensions allow-listed on the server (azure.extensions). Empty = none allowed."
+  type        = list(string)
+  default     = ["BTREE_GIST"]
+}
+
+variable "password_admin_login" {
+  description = <<-EOT
+    Login of a password administrator. null (default) keeps password sign-in off: Entra ID only. Set it only for a
+    server whose client cannot present an Entra token (Keycloak, ADR-0017).
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "password_admin_password" {
+  description = "Password of password_admin_login. Pass a random_password result, never a literal. Ignored when the login is null."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
 variable "log_analytics_workspace_id" { type = string }
 
 variable "create_entra_admin" {

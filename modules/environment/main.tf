@@ -200,6 +200,32 @@ module "postgres" {
   create_entra_admin         = var.create_entra_admin
 }
 
+# Keycloak (ADR-0017, IAC-16): dedicated PostgreSQL server, workload identity and secrets in Key Vault. Sized like
+# the scheduling server; the chart, the /idp route and the NetworkPolicy are in shp-gitops (IAM-01).
+module "keycloak_infra" {
+  source                     = "../keycloak-infra"
+  name_prefix                = local.name_prefix
+  resource_group_name        = azurerm_resource_group.this.name
+  location                   = var.location
+  tags                       = local.tags
+  tenant_id                  = var.tenant_id
+  delegated_subnet_id        = module.network.postgres_subnet_id
+  private_dns_zone_id        = module.network.private_dns_zone_ids["privatelink.postgres.database.azure.com"]
+  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
+  entra_admin                = var.entra_admin
+  create_entra_admin         = var.create_entra_admin
+  sku_name                   = local.data.pg_sku
+  high_availability          = local.data.pg_ha
+  backup_retention_days      = local.data.pg_backup_days
+  geo_redundant_backup       = local.data.pg_geo_backup
+  db_auth                    = var.keycloak_db_auth
+  oidc_issuer_url            = module.aks.oidc_issuer_url
+  key_vault_id               = module.keyvault.id
+  key_vault_name             = module.keyvault.name
+  create_key_vault_secrets   = var.create_key_vault_secrets
+  create_role_assignments    = var.create_role_assignments
+}
+
 module "mongodb" {
   source                      = "../mongodb"
   name_prefix                 = local.name_prefix

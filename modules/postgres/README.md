@@ -34,3 +34,9 @@ Security:
 - The admin token lives about 1 hour and stays only in an environment variable of the shell session; never write it to a file or the command history.
 - Do not turn password auth back on "to be quick"; do not create a user with a password.
 - When migration moves to its own Job (`scheduling_migrator`), revoke `CREATE` on the schema from the service role.
+
+## Second instance for Keycloak (IAC-16)
+
+The module is also instantiated by `modules/keycloak-infra` for the dedicated IAM server (ADR-0017). That instance sets
+`extensions = []` and, in `db_auth = password` mode only, a password administrator whose password is generated with
+`random_password` and stored in Key Vault. The default (`password_admin_login = null`) keeps password sign-in off.
