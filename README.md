@@ -39,10 +39,10 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 | Module | Azure service | Used by | Security |
 |---|---|---|---|
 | `postgres` | PostgreSQL Flexible Server, database `scheduling` | scheduling | Inside the VNet, no public address, Entra ID sign-in only (passwords off), `btree_gist` extension |
-| `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, public access off, one Entra user per service with `readWrite` on its own database only |
+| `mongodb` | Cosmos DB for MongoDB vCore | clinical, document, ai, notification, ml | Private endpoint, public access off. Per-service Entra users with `readWrite` on the service's own database are **not** created by Terraform (azurerm 4.x only accepts the role `root`, see `create_service_users`); create them in the data plane after apply |
 | `redis` | Azure Managed Redis | gateway (rate limiting), scheduling (slot cache) | Private endpoint, access keys off, Entra ID only |
 | `servicebus` | Service Bus, topic `shp-events`, 7 filtered subscriptions, the `malware-scan-results` queue, DLQ after 5 deliveries | everyone (publish), consumers (receive), document (scan results) | SAS keys off, Entra ID, TLS 1.2; Premium has a private endpoint |
-| `storage` | Two storage accounts: documents (`documents`, `quarantine`, `kb`, `mlops`) and WORM audit | document, ai, ml, audit | Shared keys off, private endpoint, versioning and 14-day soft delete; immutable audit (prod 10 years, locked) |
+| `storage` | Two storage accounts: documents (`documents`, `quarantine`, `knowledge-base`, `mlops`) and WORM audit | document, ai, ml, audit | Shared keys off, private endpoint, versioning and 14-day soft delete; immutable audit (prod 10 years, locked) |
 | `defender-storage` | Defender for Storage malware scanning; Event Grid custom topic and subscription route `Microsoft.Security.MalwareScanningResult` into the `malware-scan-results` queue | document | Topic keyless (Entra ID), delivery with a system-assigned identity; the topic must allow public access because Defender cannot publish to private-endpoint-only topics, and its events carry no clinical data |
 | `search` | Azure AI Search | ai | API keys off, private endpoint |
 | `keycloak-infra` | A second PostgreSQL Flexible Server (database `keycloak`), identity `id-<prefix>-keycloak`, secrets in Key Vault | Keycloak (namespace `shp-iam`) | Dedicated server (own backups, restore and HA), Entra sign-in on, one password login only in `db_auth = password` mode, generated with `random_password`, stored in Key Vault, never an output; the identity reads only its own secrets |
@@ -54,11 +54,29 @@ Source design: ADR-0008, ADR-0014 and `detailed-design/05, 06, 13` (application 
 1. PostgreSQL: use `workload_identity_client_ids` (stack output) to create the Entra role for `scheduling` in the database (`pgaadauth_create_principal`), then grant least privilege. The scheduling migration job does this step.
 2. Fill `workloadIdentity.clientId` and `serviceAccount.name: <service>` into each service's values in `shp-gitops` (the ServiceAccount name equals the service name, namespace `shp-apps`).
 3. Service Bus: the format of the `type` property used in the filters must match how the event library writes CloudEvents (see `13-events.md`); check with a test event before enabling consumers.
-4. Mongo: the root administrator account (`shpadmin`) exists only in the state and no service uses it. After provisioning, turn off `NativeAuth` in prod once Entra sign-in is confirmed to work.
+4. Mongo: create one Entra user per service with `readWrite` on its own database only (the `service_users` map of the `mongodb` module lists them; Terraform does not, see above). The root administrator account (`shpadmin`) exists only in the state and no service uses it. After provisioning, turn off `NativeAuth` in prod once Entra sign-in is confirmed to work.
 5. Defender for Storage: the subscription needs the Defender for Storage plan before `enable_malware_scan = true` can apply; set it to `false` where the sandbox blocks the plan. The first scan result appears in the `malware-scan-results` queue after an upload.
 6. AI provider keys: set `deepseek-api-key` and `gemini-api-key` in Key Vault from a host inside the VNet (the vault has no public endpoint). Terraform deliberately does not manage secret values. Then run the `ai-workload` module as a second apply (`enable_ai_workload = true`, `kubeconfig_path = <the new cluster>`); it creates the Ollama model-cache PVC and the CSI `SecretProviderClass`. Copy the `ai_service_values` stack output into `shp-gitops/envs/<env>/ai/values.yaml` (SCF-06).
 
 **Cost while an environment is up (per hour, estimated from public list prices):** Service Bus Premium is the largest item (about 0.9 USD/hour), followed by Cosmos DB MongoDB vCore M10 and AI Search Basic. A test environment lives at most 8 hours (cost-guard), so this is significant but bounded. To make it cheaper while the queue does not need a private endpoint yet: set `messaging_sku = "Standard"` (the namespace opens a public endpoint, Entra ID only; events carry patient ids, so **do not use it for real data**).
+
+### Who may reach which data store (IAC-20)
+
+Derived from the role assignments and database users in `modules/environment/main.tf` (the `data_access` output; `tests/data-access.tftest.hcl` asserts it). Every service has its own managed identity; the identity has no access to a store that is not in its row. Service Bus is the only shared resource: every service may publish (audit events E11), only the seven consumers may receive, each on its own subscription.
+
+| Service | PostgreSQL | MongoDB database | Redis | Blob | AI Search | Key Vault secrets | Service Bus receive |
+|---|---|---|---|---|---|---|---|
+| scheduling | `scheduling` | none | yes | none | none | none | own subscription |
+| gateway | none | none | yes | none | none | none | none |
+| clinical | none | `clinical` | none | none | none | none | own subscription |
+| document | none | `document` | none | `documents`, `quarantine`; queue `malware-scan-results` | none | none | own subscription |
+| notification | none | `notification` | none | none | none | none | own subscription |
+| ai | none | `ai` | none | `knowledge-base` | index data | yes | own subscription |
+| ml | none | `ml` | none | `mlops` | none | none | own subscription |
+| audit | none | none | none | `audit` (WORM) | none | none | own subscription |
+| keycloak | own IAM server (`keycloak`) | none | none | none | none | its two secrets only | none |
+
+Limits of this evidence: the PostgreSQL role and the Mongo users are data-plane steps after apply, so the table shows what Terraform grants and what the post-apply steps must create; it does not show what Azure enforces at runtime.
 
 ## GitHub variables required (not secrets)
 `AZURE_TENANT_ID` · `AZURE_SUBSCRIPTION_ID` · `TFSTATE_STORAGE_ACCOUNT` · `ACR_NAME` · `ADMIN_IP_RANGES` (JSON, for example `["203.0.113.5/32"]`) ·
@@ -79,11 +97,11 @@ The identity `AZURE_CLIENT_ID_INFRA_<ENV>` additionally needs permission to run 
 ## Done / still missing
 | Done (`fmt` + `validate` + tflint + Trivy clean) | Remaining (backlog) |
 |---|---|
-| bootstrap, network, monitoring, Key Vault, AKS (3 node pools), 2 stacks, 4 workflows | IAC-15 workload identity per service, IAC-16 Entra app, Azure OpenAI |
-| IAC-09..14 data modules (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search); IAC-18 Defender for Storage + Event Grid scan results | |
+| bootstrap, network, monitoring, Key Vault, AKS (3 node pools), 2 stacks, 4 workflows | Azure OpenAI |
+| IAC-09..15 data modules and workload identity per service (PostgreSQL, Cosmos DB for MongoDB, Redis, Storage, Service Bus, AI Search); IAC-18 Defender for Storage + Event Grid scan results | |
 | IAC-19 ai node pool + Ollama model-cache PVC + Key Vault CSI reference (the PVC/CSI objects are a second, opt-in apply) | |
 | | OBS-01: connect Managed Prometheus (needs a data collection rule), Grafana |
-| IAC-16: Keycloak infrastructure (IAM PostgreSQL, identity, Key Vault secrets). The `/idp` route and the NetworkPolicy are Kubernetes objects in `shp-gitops` (IAM-01) | |
+| IAC-16: Keycloak infrastructure (IAM PostgreSQL, identity, Key Vault secrets); IAC-20: all data and identity modules composed in both stacks, offline plan test (`terraform test`) | A real `terraform plan` of both stacks (needs Azure credentials; the CI `plan` job covers UAT only). Per-service Mongo users (data plane). The `/idp` route and the NetworkPolicy are in `shp-gitops` (IAM-01) |
 | ENV-01: `env-provision` installs Argo CD and hands the cluster to GitOps (not yet tried on real Azure) | Rest of ENV-01: load synthetic data, smoke test after provisioning |
 
 > **Not yet `apply`-ed to Azure** (per the project rule) and the workflows have not run on real GitHub. The tflint `azurerm` plugin could not run where the code was written; CI runs it.

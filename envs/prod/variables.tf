@@ -103,6 +103,18 @@ variable "create_tag_policy" {
   default     = true
 }
 
+variable "keycloak_db_auth" {
+  description = "How Keycloak signs in to its PostgreSQL server: password (generated, kept only in Key Vault) or entra. Settled in IAM-01."
+  type        = string
+  default     = "password"
+}
+
+variable "create_key_vault_secrets" {
+  description = "Write the generated Keycloak secrets into Key Vault. Set false if the deploying identity cannot write vault secrets."
+  type        = bool
+  default     = true
+}
+
 variable "extra_tags" {
   description = "Extra tags required by the subscription's tag policy; see modules/environment."
   type        = map(string)

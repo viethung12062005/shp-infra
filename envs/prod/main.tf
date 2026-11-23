@@ -44,6 +44,8 @@ module "environment" {
   create_containers            = var.create_containers
   create_entra_admin           = var.create_entra_admin
   create_tag_policy            = var.create_tag_policy
+  create_key_vault_secrets     = var.create_key_vault_secrets
+  keycloak_db_auth             = var.keycloak_db_auth
   grafana_admin_principal_ids  = var.grafana_admin_principal_ids
   grafana_viewer_principal_ids = var.grafana_viewer_principal_ids
 }
