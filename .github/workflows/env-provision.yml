@@ -133,7 +133,7 @@ jobs:
       # GitHub App (repo-creds for the whole owner). Commands run with `az aks command invoke`, so the API server stays
       # closed to the runner. Synthetic data seeding and smoke tests are not automated yet.
       - id: repo-app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.ARGOCD_REPO_APP_ID }}
           private-key: ${{ secrets.ARGOCD_REPO_APP_PRIVATE_KEY }}
